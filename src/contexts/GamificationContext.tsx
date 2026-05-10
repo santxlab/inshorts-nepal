@@ -24,11 +24,9 @@ const GamificationContext = createContext<GamificationContextType | null>(null);
 export function GamificationProvider({ children }: { children: ReactNode }) {
   const [gami, setGami] = useState<UserGamification>(DEFAULT_GAMIFICATION);
   const [newBadges, setNewBadges] = useState<Badge[]>([]);
-  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setGami(loadGamification());
-    setLoaded(true);
   }, []);
 
   const update = useCallback((updater: (g: UserGamification) => UserGamification) => {
