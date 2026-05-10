@@ -3,14 +3,25 @@ import { fetchAllSources } from "@/lib/rss-fetcher";
 import { verifyToken } from "@/lib/auth";
 import { Language } from "@/types";
 
+// Simple in-memory rate limit: allow public fetch at most every 10 minutes
+let lastPublicFetch = 0;
+const PUBLIC_FETCH_INTERVAL = 10 * 60 * 1000; // 10 minutes
+
 export async function POST(req: NextRequest) {
   const token = req.cookies.get("admin_token")?.value;
-  if (!token || !verifyToken(token)) {
-    // Allow public fetch for dev (remove in production)
-    const isDev = process.env.NODE_ENV === "development";
-    if (!isDev) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const isAdmin = token && !!verifyToken(token);
+
+  if (!isAdmin) {
+    // Public (app) fetch — rate limited
+    const now = Date.now();
+    if (now - lastPublicFetch < PUBLIC_FETCH_INTERVAL) {
+      return NextResponse.json({
+        success: true,
+        message: "Rate limited — using cached articles",
+        rateLimited: true,
+      });
     }
+    lastPublicFetch = now;
   }
 
   const body = await req.json().catch(() => ({}));
