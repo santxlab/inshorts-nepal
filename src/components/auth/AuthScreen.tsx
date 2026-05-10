@@ -30,7 +30,8 @@ export default function AuthScreen() {
   if (mode === "welcome") {
     return (
       <div className="fixed inset-0 z-50 bg-gradient-to-br from-[#DC143C] via-[#8B0000] to-[#003893] flex flex-col items-center justify-center px-6 text-center">
-        <div className="text-6xl mb-4">🇳🇵</div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon-192.png" alt="InShorts Nepal" className="w-20 h-20 rounded-2xl mb-4 shadow-2xl" />
         <h1 className="text-4xl font-black text-white mb-2">InShorts Nepal</h1>
         <p className="text-white/70 text-lg mb-1">Nepal's #1 news app</p>
         <p className="text-white/50 text-sm mb-12">नेपालको सबैभन्दा राम्रो समाचार एप</p>
@@ -72,7 +73,8 @@ export default function AuthScreen() {
       </button>
 
       <div className="text-center mb-8">
-        <div className="text-4xl mb-3">🇳🇵</div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon-192.png" alt="InShorts Nepal" className="w-14 h-14 rounded-xl mx-auto mb-3 shadow-xl" />
         <h2 className="text-2xl font-bold text-white">
           {mode === "signin" ? "Welcome back" : "Join InShorts Nepal"}
         </h2>
