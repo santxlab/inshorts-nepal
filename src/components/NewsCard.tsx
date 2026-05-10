@@ -203,7 +203,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
   return (
     <div
-      className="news-snap-item relative w-full overflow-hidden select-none"
+      className="relative w-full h-full overflow-hidden select-none"
       style={{ background: "#0a0a0a" }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
