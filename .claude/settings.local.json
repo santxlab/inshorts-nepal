@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\nodejs\"; Set-Location D:\\\\Development\\\\inshort; $proc = Start-Process -FilePath \"cmd.exe\" -ArgumentList \"/c\",\"C:\\\\`\"Program Files`\"\\\\nodejs\\\\npm.cmd run dev > D:\\\\Development\\\\inshort\\\\dev.log 2>&1\" -WindowStyle Hidden -PassThru; Write-Host \"Started PID: $\\($proc.Id\\)\")",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__navigate",
+      "Bash(\"C:\\\\Program Files\\\\nodejs\\\\node_modules\\\\.bin\\\\next.cmd\" build)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:3005\" -TimeoutSec 10 -UseBasicParsing)",
+      "PowerShell($env:NODE_ENV=\"development\"; Start-Process -FilePath \"D:\\\\Development\\\\inshort\\\\node_modules\\\\.bin\\\\next.cmd\" -ArgumentList \"dev -p 3005\" -WorkingDirectory \"D:\\\\Development\\\\inshort\" -WindowStyle Normal -PassThru | Select-Object Id)",
+      "PowerShell($r = Invoke-WebRequest -Uri \"http://localhost:3005/api/news?lang=ne&limit=5\" -UseBasicParsing -TimeoutSec 10; Write-Output $r.Content)",
+      "PowerShell(Get-ChildItem \"D:\\\\Development\\\\inshort\\\\src\\\\app\\\\admin\\\\\" -Recurse | Where-Object { $_.Name -eq \"page.tsx\" } | Format-Table FullName, Length -AutoSize)"
+    ]
+  }
+}

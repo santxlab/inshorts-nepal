@@ -1,0 +1,100 @@
+﻿Γû▓ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3005
+- Network:       http://192.168.1.18:3005
+- Environments: .env.local
+Γ£ô Ready in 7.2s
+
+ GET / 200 in 1773ms (next.js: 906ms, application-code: 866ms)
+ GET /api/news?lang=en&category=all&limit=30 200 in 227ms (next.js: 199ms, application-code: 29ms)
+next.cmd : Γ¿» upstream image response failed for 
+https://images.unsplash.com/photo-1540747913346-19212a4b3c55?w=800&auto=format 404
+At D:\Development\inshort\start-dev.ps1:3 char:1
++ & "D:\Development\inshort\node_modules\.bin\next.cmd" dev -p 3005 2>& ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Γ¿» upstream im...auto=format 404:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ GET / 200 in 251ms (next.js: 28ms, application-code: 222ms)
+ GET /api/news?lang=en&category=all&limit=30 200 in 41ms (next.js: 14ms, application-code: 27ms)
+Γ¿» upstream image response failed for https://images.unsplash.com/photo-1540747913346-19212a4b3c55?w=800&auto=format 
+404
+(node:18104) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have 
+security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Failed to fetch from My Republica: Error: Status code 404
+    at ignore-listed frames
+Failed to fetch from The Himalayan Times: Error: Status code 404
+    at ignore-listed frames
+ POST /api/fetch-rss 200 in 2.5s (next.js: 1287ms, application-code: 1178ms)
+ GET /api/news?lang=en&category=all&limit=30 200 in 31ms (next.js: 12ms, application-code: 19ms)
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `en-kpost-aHR0cHM6Ly9rYXRo`. Keys should be unique so that 
+components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted 
+ΓÇö the behavior is unsupported and could change in a future version. 
+ GET /admin 200 in 311ms (next.js: 73ms, application-code: 238ms)
+ GET /api/admin/auth 200 in 136ms (next.js: 112ms, application-code: 24ms)
+ GET /api/admin/articles 200 in 146ms (next.js: 128ms, application-code: 18ms)
+ GET /api/admin/articles 200 in 22ms (next.js: 7ms, application-code: 15ms)
+ GET /api/admin/articles 200 in 21ms (next.js: 7ms, application-code: 14ms)
+ GET /api/admin/articles 200 in 24ms (next.js: 7ms, application-code: 17ms)
+ GET /api/admin/articles 200 in 26ms (next.js: 8ms, application-code: 18ms)
+ GET /api/admin/articles 200 in 19ms (next.js: 8ms, application-code: 11ms)
+ GET /api/admin/articles 200 in 29ms (next.js: 9ms, application-code: 20ms)
+ GET /api/admin/articles 200 in 26ms (next.js: 10ms, application-code: 16ms)
+ GET /api/admin/articles 200 in 33ms (next.js: 20ms, application-code: 13ms)
+ GET /api/admin/articles 200 in 31ms (next.js: 13ms, application-code: 18ms)
+ GET /api/admin/articles 200 in 15ms (next.js: 6ms, application-code: 9ms)
+^C
