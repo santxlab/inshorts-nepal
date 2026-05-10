@@ -18,17 +18,27 @@ export default function NewsFeed({ selectedTopic }: Props) {
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Drag state for live follow-finger feel
+  const [dragY, setDragY] = useState(0);
+
+  // Touch tracking refs
+  const touchStartY = useRef<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartTime = useRef<number>(0);
+  const isVerticalSwipe = useRef(false);
+  const isNavigating = useRef(false);
+
   const isOnline = useOnlineStatus();
   const isNepali = prefs.language !== "en";
 
-  // Map app language to rss language
   const langMap: Record<string, "ne" | "en"> = {
     ne: "ne", en: "en", hi: "ne", mai: "ne", thr: "ne",
     bho: "ne", tam: "ne", baj: "ne", awa: "ne", new: "ne",
   };
   const rssLang = langMap[prefs.language] ?? "ne";
 
+  // ── Data fetching ──────────────────────────────────────────
   const fetchNews = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -39,9 +49,6 @@ export default function NewsFeed({ selectedTopic }: Props) {
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       const fetched: NewsArticle[] = data.articles ?? [];
-
-      // AI personalization: reorder by behavioral topic scores (client-side)
-      // Falls back to chronological order if no behavior data yet
       const profile = loadBehaviorProfile();
       const personalized = personalizeOrder<NewsArticle>(fetched, profile);
       setArticles(personalized);
@@ -69,25 +76,70 @@ export default function NewsFeed({ selectedTopic }: Props) {
 
   useEffect(() => { fetchNews(); }, [fetchNews]);
 
-  // Track current card via scroll
+  // Reset to top when filter or language changes
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const cardH = el.clientHeight;
-      const idx = Math.round(el.scrollTop / cardH);
-      setCurrentIndex(idx);
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Reset on filter change
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0, behavior: "instant" });
     setCurrentIndex(0);
+    setDragY(0);
   }, [selectedTopic, prefs.language]);
 
+  // ── Navigation ─────────────────────────────────────────────
+  const navigateTo = useCallback((index: number, total: number) => {
+    if (isNavigating.current) return;
+    const clamped = Math.max(0, Math.min(total - 1, index));
+    if (clamped === currentIndex) return;
+    isNavigating.current = true;
+    setCurrentIndex(clamped);
+    // Unlock after transition completes
+    setTimeout(() => { isNavigating.current = false; }, 380);
+  }, [currentIndex]);
+
+  // ── Touch handlers (vertical swipe = navigate, horizontal = card actions) ──
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartTime.current = Date.now();
+    isVerticalSwipe.current = false;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartY.current === null || touchStartX.current === null) return;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    const dx = e.touches[0].clientX - touchStartX.current;
+
+    // Lock swipe direction after initial movement
+    if (!isVerticalSwipe.current && (Math.abs(dy) > 8 || Math.abs(dx) > 8)) {
+      isVerticalSwipe.current = Math.abs(dy) > Math.abs(dx);
+    }
+
+    if (isVerticalSwipe.current) {
+      // Rubber-band at edges
+      setDragY(dy);
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent, totalItems: number) => {
+    if (touchStartY.current === null) return;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    const dt = Date.now() - touchStartTime.current;
+    const velocity = Math.abs(dy) / Math.max(dt, 1); // px/ms
+
+    setDragY(0);
+    touchStartY.current = null;
+    touchStartX.current = null;
+
+    if (!isVerticalSwipe.current) return;
+
+    // Fast flick needs less distance
+    const threshold = velocity > 0.4 ? 25 : 55;
+
+    if (dy < -threshold) {
+      navigateTo(currentIndex + 1, totalItems);
+    } else if (dy > threshold) {
+      navigateTo(currentIndex - 1, totalItems);
+    }
+  }, [currentIndex, navigateTo]);
+
+  // ── Loading / error states ─────────────────────────────────
   if (loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-black">
@@ -99,7 +151,8 @@ export default function NewsFeed({ selectedTopic }: Props) {
         </p>
         <div className="flex gap-1.5">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="w-2 h-2 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+            <div key={i} className="w-2 h-2 rounded-full bg-red-500 animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s` }} />
           ))}
         </div>
       </div>
@@ -128,20 +181,26 @@ export default function NewsFeed({ selectedTopic }: Props) {
     );
   }
 
-  // Insert poll card every 8 articles
-  const items: Array<{ type: "article"; data: NewsArticle } | { type: "poll" }> = [];
+  // Build item list: article + poll every 8
+  const items: Array<{ type: "article"; data: NewsArticle; key: string } | { type: "poll"; key: string }> = [];
   articles.forEach((a, i) => {
-    items.push({ type: "article", data: a });
-    if ((i + 1) % 8 === 0) items.push({ type: "poll" });
+    items.push({ type: "article", data: a, key: a.id });
+    if ((i + 1) % 8 === 0) items.push({ type: "poll", key: `poll-${i}` });
   });
 
   return (
-    <div className="flex-1 flex flex-col relative overflow-hidden bg-black">
-      {/* Digest banner (above scroll, morning/evening only) */}
+    <div
+      className="flex-1 relative overflow-hidden bg-black"
+      style={{ touchAction: "none" }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={(e) => handleTouchEnd(e, items.length)}
+    >
+      {/* Digest banner (above cards) */}
       <DigestBanner articleCount={articles.length} />
 
-      {/* Article counter + refresh */}
-      <div className="absolute top-0 right-0 z-20 flex items-center gap-2 p-2">
+      {/* Counter + refresh */}
+      <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
         <span className="text-[10px] text-white/30 bg-black/50 px-2 py-1 rounded-full">
           {currentIndex + 1} / {items.length}
         </span>
@@ -157,29 +216,52 @@ export default function NewsFeed({ selectedTopic }: Props) {
 
       {/* Offline chip */}
       {!isOnline && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
           <div className="flex items-center gap-1.5 bg-yellow-900/80 text-yellow-300 text-xs px-3 py-1.5 rounded-full">
             📵 {isNepali ? "अफलाइन" : "Offline"}
           </div>
         </div>
       )}
 
-      {/* Scroll container */}
-      <div ref={scrollRef} className="news-scroll flex-1">
-        {items.map((item, i) =>
-          item.type === "poll" ? (
-            <PollCard key={`poll-${i}`} />
-          ) : (
-            <NewsCard
-              key={item.data.id}
-              article={item.data}
-              index={i}
-              total={items.length}
-              isActive={currentIndex === i}
-            />
-          )
-        )}
-      </div>
+      {/* ── Card pager ────────────────────────────────────────
+          Each card is absolute inset-0. We translateY by offset * 100%
+          (% is relative to the element itself = container height). ──── */}
+      {items.map((item, i) => {
+        const offset = i - currentIndex;
+
+        // Only render current card ± 2 for performance
+        if (Math.abs(offset) > 2) return null;
+
+        // Compute per-card translateY
+        const baseY = offset * 100; // %
+        const resistanceFactor = 0.35;
+        const extraY = isVerticalSwipe.current ? dragY * resistanceFactor : 0;
+        const transformValue = `calc(${baseY}% + ${extraY}px)`;
+
+        return (
+          <div
+            key={item.key}
+            className="absolute inset-0"
+            style={{
+              transform: `translateY(${transformValue})`,
+              transition: dragY !== 0 ? "none" : "transform 350ms cubic-bezier(0.4, 0, 0.2, 1)",
+              willChange: "transform",
+              pointerEvents: offset === 0 ? "auto" : "none",
+            }}
+          >
+            {item.type === "poll" ? (
+              <PollCard />
+            ) : (
+              <NewsCard
+                article={item.data}
+                index={i}
+                total={items.length}
+                isActive={currentIndex === i}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -192,7 +274,10 @@ function useOnlineStatus() {
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
   }, []);
   return online;
 }

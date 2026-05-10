@@ -19,30 +19,19 @@ html, body {
   height: 100%;
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
-  touch-action: pan-y;
+  touch-action: manipulation;
 }
 
 /* ═══════════════════════════════════════════
-   NEWS SNAP SCROLL
+   NEWS CARD PAGER
+   Cards are absolute inset-0, translated by
+   (offset * 100%) + dragY for swipe navigation.
 ═══════════════════════════════════════════ */
-.news-scroll {
-  overflow-y: scroll;
-  scroll-snap-type: y mandatory;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  height: 100%;
-}
-
-.news-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.news-snap-item {
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
+.news-card-detail {
+  /* Scrollable detail panel inside a card */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 /* ═══════════════════════════════════════════

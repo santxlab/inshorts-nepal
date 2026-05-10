@@ -422,7 +422,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
           className="absolute inset-0 z-40 bg-black/96 flex flex-col"
           onClick={() => setShowDetail(false)}
         >
-          <div className="flex-1 overflow-y-auto p-5 pt-10" onClick={(e) => e.stopPropagation()}>
+          <div className="news-card-detail flex-1 p-5 pt-10" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setShowDetail(false)}
               className="text-white/50 text-sm mb-6 flex items-center gap-2"
