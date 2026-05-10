@@ -4,6 +4,7 @@ import { adStore } from "@/lib/ad-store";
 import { referralStore } from "@/lib/referral-store";
 import { socialPublisher } from "@/lib/social-publisher";
 import { store } from "@/lib/store";
+import { installStore } from "@/lib/install-store";
 
 export async function GET() {
   const dashboard = analyticsStore.getDashboardStats();
@@ -11,6 +12,7 @@ export async function GET() {
   const referralStats = referralStore.getStats();
   const socialStats = socialPublisher.getStats();
   const articleStats = store.getStats();
+  const installStats = installStore.getStats();
 
   return NextResponse.json({
     dashboard,
@@ -18,5 +20,6 @@ export async function GET() {
     referral: referralStats,
     social: socialStats,
     articles: articleStats,
+    installs: installStats,
   });
 }

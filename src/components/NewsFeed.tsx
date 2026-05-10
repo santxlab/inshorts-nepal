@@ -32,9 +32,14 @@ export default function NewsFeed({ selectedTopic }: Props) {
   const isOnline = useOnlineStatus();
   const isNepali = prefs.language !== "en";
 
+  // Only Nepali ("ne") gets Nepali RSS feed.
+  // Hindi and all other languages fall back to English RSS since those
+  // RSS sources don't exist separately yet.
   const langMap: Record<string, "ne" | "en"> = {
-    ne: "ne", en: "en", hi: "ne", mai: "ne", thr: "ne",
-    bho: "ne", tam: "ne", baj: "ne", awa: "ne", new: "ne",
+    ne: "ne",
+    en: "en",
+    hi: "en", mai: "en", thr: "en",
+    bho: "en", tam: "en", baj: "en", awa: "en", new: "en",
   };
   const rssLang = langMap[prefs.language] ?? "ne";
 

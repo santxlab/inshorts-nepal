@@ -45,6 +45,14 @@ interface SocialStat {
   posts: number;
 }
 
+interface InstallStats {
+  totalInstalls: number;
+  newToday: number;
+  activeToday: number;
+  byPlatform: Record<string, number>;
+  last7: { date: string; newInstalls: number; activeSessions: number }[];
+}
+
 interface AnalyticsData {
   dau?: number;
   mau?: number;
@@ -63,6 +71,7 @@ interface AnalyticsData {
   topTopics?: TopTopic[];
   adStats?: AdStat[];
   socialStats?: SocialStat[];
+  installs?: InstallStats;
 }
 
 function StatCard({
@@ -170,6 +179,40 @@ export default function AnalyticsPage() {
         </div>
       ) : (
         <>
+          {/* App Installs Section */}
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-4">
+            <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+              📲 App Installs & Sessions
+            </h2>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-white">{(data?.installs?.totalInstalls ?? 0).toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">Total Installs</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-400">{(data?.installs?.newToday ?? 0).toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">New Today</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-400">{(data?.installs?.activeToday ?? 0).toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">Active Today</p>
+              </div>
+            </div>
+            {/* Platform breakdown */}
+            <div className="flex gap-3 flex-wrap">
+              {Object.entries(data?.installs?.byPlatform ?? {}).map(([platform, count]) => (
+                <div key={platform} className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg">
+                  <span className="text-sm">{platform === "android" ? "🤖" : platform === "ios" ? "🍎" : "🌐"}</span>
+                  <span className="text-white text-sm font-semibold">{count}</span>
+                  <span className="text-gray-500 text-xs capitalize">{platform}</span>
+                </div>
+              ))}
+              {Object.keys(data?.installs?.byPlatform ?? {}).length === 0 && (
+                <p className="text-gray-600 text-xs">No install data yet — installs tracked when users open the app</p>
+              )}
+            </div>
+          </div>
+
           {/* Row 1: User & Views */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <StatCard icon={Users} label="DAU" value={(data?.dau ?? 0).toLocaleString()} color="blue" />

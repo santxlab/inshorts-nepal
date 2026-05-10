@@ -44,6 +44,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
   const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
   const lastTap = useRef<number>(0);
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startReadTime = useRef<number>(Date.now());
 
@@ -181,16 +182,27 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
     const absDx = Math.abs(dx), absDy = Math.abs(dy);
 
+    // Single tap → open detail (with delay to allow double-tap detection)
     // Double tap → like
     const now = Date.now();
     if (absDx < 10 && absDy < 10 && dt < 300) {
       if (now - lastTap.current < 350) {
+        // Double tap — cancel pending single-tap open, trigger like
+        if (singleTapTimer.current) { clearTimeout(singleTapTimer.current); singleTapTimer.current = null; }
         handleLike();
         lastTap.current = 0;
         touchStart.current = null;
         return;
       }
       lastTap.current = now;
+      // Single tap — open detail after short delay
+      if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+      singleTapTimer.current = setTimeout(() => {
+        singleTapTimer.current = null;
+        setShowDetail(true);
+      }, 280);
+      touchStart.current = null;
+      return;
     }
 
     if (absDx > absDy * 1.5) {
@@ -353,25 +365,21 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
           </button>
         )}
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1 scrollbar-none">
+        {/* Action row 1: Like | Save | Listen | Read More */}
+        <div className="flex items-center gap-2 mb-2">
           <button
             onClick={handleLike}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-              liked
-                ? "bg-red-500/30 text-red-300 border border-red-500/40"
-                : "bg-white/10 text-white/70 border border-white/10"
+            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-semibold transition-all ${
+              liked ? "bg-red-500/30 text-red-300 border border-red-500/40" : "bg-white/10 text-white/70 border border-white/10"
             }`}
           >
-            {liked ? "❤️" : "🤍"} {isNepali ? "मन पर्यो" : "Like"}
+            {liked ? "❤️" : "🤍"} {isNepali ? "लाइक" : "Like"}
           </button>
 
           <button
             onClick={handleSave}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-              saved
-                ? "bg-amber-500/30 text-amber-300 border border-amber-500/40"
-                : "bg-white/10 text-white/70 border border-white/10"
+            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-semibold transition-all ${
+              saved ? "bg-amber-500/30 text-amber-300 border border-amber-500/40" : "bg-white/10 text-white/70 border border-white/10"
             }`}
           >
             {saved ? "🔖" : "📋"} {isNepali ? "सेव" : "Save"}
@@ -379,18 +387,35 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
           <button
             onClick={handleAudio}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-              isPlaying
-                ? "bg-purple-500/40 text-purple-200 border border-purple-500/40"
-                : "bg-white/10 text-white/70 border border-white/10"
+            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-semibold transition-all ${
+              isPlaying ? "bg-purple-500/40 text-purple-200 border border-purple-500/40" : "bg-white/10 text-white/70 border border-white/10"
             }`}
           >
             {isPlaying ? "⏹️" : "🎧"} {isNepali ? (isPlaying ? "रोक्नु" : "सुन्नु") : (isPlaying ? "Stop" : "Listen")}
           </button>
 
           <button
+            onClick={() => setShowDetail(true)}
+            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold bg-white/20 text-white border border-white/30"
+          >
+            📖 {isNepali ? "पढ्नु" : "Read"}
+          </button>
+        </div>
+
+        {/* Action row 2: Share buttons always visible */}
+        <div className="flex items-center gap-2 mb-3">
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(article.title + "\n\n" + article.summary.slice(0, 100) + "...\n\n" + article.sourceUrl)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-green-600/80 text-white"
+          >
+            📱 WhatsApp
+          </a>
+
+          <button
             onClick={handleShare}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white/10 text-white/70 border border-white/10"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold bg-white/10 text-white/80 border border-white/20"
           >
             📤 {isNepali ? "सेयर" : "Share"}
           </button>
@@ -399,19 +424,18 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
             href={article.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-shrink-0 ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white/20 text-white border border-white/30"
+            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold bg-red-600/80 text-white"
           >
-            {isNepali ? "पूरा पढ्नुहोस्" : "Full Story"} →
+            🔗 {isNepali ? "मूल" : "Source"}
           </a>
         </div>
 
         {/* Gesture hints (first card only) */}
         {index === 0 && (
-          <div className="flex justify-center gap-6 pb-2 opacity-35">
+          <div className="flex justify-center gap-6 pb-1 opacity-30">
+            <span className="text-white text-[10px]">↑↓ {isNepali ? "स्वाइप" : "Swipe"}</span>
             <span className="text-white text-[10px]">→ {isNepali ? "सेव" : "Save"}</span>
-            <span className="text-white text-[10px]">↑ {isNepali ? "अर्को" : "Next"}</span>
-            <span className="text-white text-[10px]">← {isNepali ? "थप" : "More"}</span>
-            <span className="text-white text-[10px]">∥∥ {isNepali ? "सुन्नु" : "Listen"}</span>
+            <span className="text-white text-[10px]">∥∥ {isNepali ? "होल्ड" : "Hold"}</span>
           </div>
         )}
       </div>
@@ -454,7 +478,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
               <p className="text-white/40 text-xs">
                 {isNepali ? "प्रकाशित" : "Published by"}: {article.sourceName}
               </p>
-              <div className="flex gap-3">
+              <div className="flex gap-3 mb-3">
                 <button
                   onClick={handleSave}
                   className={`flex-1 py-3 rounded-xl text-sm font-bold border transition-all ${
@@ -471,6 +495,22 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
                 >
                   {isNepali ? "पूरा पढ्नुहोस् →" : "Read Full →"}
                 </a>
+              </div>
+              <div className="flex gap-3">
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(article.title + "\n\n" + article.sourceUrl)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 rounded-xl text-sm font-bold bg-green-600 text-white text-center"
+                >
+                  📱 WhatsApp
+                </a>
+                <button
+                  onClick={handleShare}
+                  className="flex-1 py-3 rounded-xl text-sm font-semibold bg-white/10 text-white border border-white/20"
+                >
+                  📤 {isNepali ? "सेयर" : "Share"}
+                </button>
               </div>
             </div>
           </div>

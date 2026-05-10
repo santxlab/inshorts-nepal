@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TopicId } from "@/types";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +23,24 @@ export default function Home() {
 
   // Keep push notification server updated with latest behavioral topic scores
   usePushBehaviorSync();
+
+  // Track app open / install
+  useEffect(() => {
+    try {
+      let deviceId = localStorage.getItem("_did");
+      if (!deviceId) {
+        deviceId = `d-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        localStorage.setItem("_did", deviceId);
+      }
+      const platform = /android/i.test(navigator.userAgent) ? "android"
+        : /iphone|ipad/i.test(navigator.userAgent) ? "ios" : "web";
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, platform, version: "1.0" }),
+      }).catch(() => {});
+    } catch { /* non-critical */ }
+  }, []);
 
   // Wait for localStorage to hydrate
   if (!loaded || authLoading) {
