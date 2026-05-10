@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import NewsCard from "./NewsCard";
 import PollCard from "./PollCard";
 import DigestBanner from "./DigestBanner";
@@ -178,12 +178,15 @@ export default function NewsFeed({ selectedTopic }: Props) {
     );
   }
 
-  // Build item list: article + poll every 8
-  const items: Array<{ type: "article"; data: NewsArticle; key: string } | { type: "poll"; key: string }> = [];
-  articles.forEach((a, i) => {
-    items.push({ type: "article", data: a, key: a.id });
-    if ((i + 1) % 8 === 0) items.push({ type: "poll", key: `poll-${i}` });
-  });
+  // Build item list: article + poll every 8 — memoized so counter is always in sync
+  const items = useMemo(() => {
+    const list: Array<{ type: "article"; data: NewsArticle; key: string } | { type: "poll"; key: string }> = [];
+    articles.forEach((a, i) => {
+      list.push({ type: "article", data: a, key: a.id });
+      if ((i + 1) % 8 === 0) list.push({ type: "poll", key: `poll-${i}` });
+    });
+    return list;
+  }, [articles]);
 
   return (
     <div
