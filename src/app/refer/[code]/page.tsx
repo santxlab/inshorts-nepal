@@ -4,12 +4,13 @@ import { referralStore } from "@/lib/referral-store";
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inshortsnepal.org";
 
 interface Props {
-  params: { code: string };
-  searchParams: { [key: string]: string | undefined };
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ [key: string]: string | undefined }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const ref = referralStore.getCode(params.code);
+  const { code } = await params;
+  const ref = referralStore.getCode(code);
   return {
     title: ref
       ? `${ref.userName} invited you to InShorts Nepal`
@@ -23,13 +24,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default function ReferralPage({ params }: Props) {
-  const ref = referralStore.getCode(params.code);
+export default async function ReferralPage({ params }: Props) {
+  const { code } = await params;
+  const ref = referralStore.getCode(code);
   const isValid = !!ref && ref.isActive;
 
   // Track click server-side
   if (isValid) {
-    referralStore.trackEvent(params.code, "click", { sessionId: "web" });
+    referralStore.trackEvent(code, "click", { sessionId: "web" });
   }
 
   const appStoreLink = process.env.NEXT_PUBLIC_APP_STORE_LINK ?? "#";
@@ -45,7 +47,7 @@ export default function ReferralPage({ params }: Props) {
             "@context": "https://schema.org",
             "@type": "WebPage",
             name: "InShorts Nepal Referral",
-            url: `${BASE_URL}/refer/${params.code}`,
+            url: `${BASE_URL}/refer/${code}`,
           }),
         }}
       />
@@ -80,7 +82,7 @@ export default function ReferralPage({ params }: Props) {
         <div className="space-y-3">
           {/* Deep link — try to open app, fallback to store */}
           <a
-            href={`inshorts-nepal://refer?code=${params.code}`}
+            href={`inshorts-nepal://refer?code=${code}`}
             className="block w-full py-4 rounded-2xl nepal-gradient text-white font-black text-lg text-center shadow-xl"
           >
             Open App
@@ -108,7 +110,7 @@ export default function ReferralPage({ params }: Props) {
       <script dangerouslySetInnerHTML={{
         __html: `
           (function() {
-            var code = "${params.code}";
+            var code = "${code}";
             var appUrl = "inshorts-nepal://refer?code=" + code;
             var start = Date.now();
             var timeout = setTimeout(function() {

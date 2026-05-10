@@ -6,11 +6,12 @@ import { NewsArticle } from "@/types";
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inshortsnepal.org";
 
 interface Props {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const article = store.getAllArticles().find((a) => a.id === params.id);
+  const { id } = await params;
+  const article = store.getAllArticles().find((a) => a.id === id);
   if (!article) return { title: "Article not found" };
 
   const description = article.summary.slice(0, 160);
@@ -54,8 +55,9 @@ function timeAgo(iso: string): string {
   return `${Math.floor(diff / 86400)} days ago`;
 }
 
-export default function ArticlePage({ params }: Props) {
-  const article: NewsArticle | undefined = store.getAllArticles().find((a) => a.id === params.id);
+export default async function ArticlePage({ params }: Props) {
+  const { id } = await params;
+  const article: NewsArticle | undefined = store.getAllArticles().find((a) => a.id === id);
   if (!article) notFound();
 
   const canonical = `${BASE_URL}/news/${article.id}`;
