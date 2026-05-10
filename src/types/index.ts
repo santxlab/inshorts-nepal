@@ -15,7 +15,9 @@ export const LANGUAGE_CONFIG: Record<Language, {
 }> = {
   ne:  { label: "Nepali",      nativeLabel: "नेपाली",              flag: "🇳🇵", rssLang: "ne" },
   en:  { label: "English",     nativeLabel: "English",              flag: "🇬🇧", rssLang: "en" },
-  hi:  { label: "Hindi",       nativeLabel: "हिन्दी",               flag: "🇮🇳", rssLang: "ne" },
+  // No dedicated RSS feeds for these languages yet — fall back to English RSS
+  // (better than Nepali for Hindi speakers; can be changed per language once feeds exist)
+  hi:  { label: "Hindi",       nativeLabel: "हिन्दी",               flag: "🇮🇳", rssLang: "en" },
   mai: { label: "Maithali",    nativeLabel: "मैथिली",               flag: "🇳🇵", rssLang: "ne" },
   thr: { label: "Tharu",       nativeLabel: "थारू",                 flag: "🇳🇵", rssLang: "ne" },
   bho: { label: "Bhojpuri",    nativeLabel: "भोजपुरी",             flag: "🇳🇵", rssLang: "ne" },

@@ -57,6 +57,15 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
   const isNepali = prefs.language !== "en";
   const topicConfig = article.topics?.[0] ? getTopicById(article.topics[0]) : null;
 
+  // Cleanup timers and audio on unmount
+  useEffect(() => {
+    return () => {
+      if (singleTapTimer.current) { clearTimeout(singleTapTimer.current); singleTapTimer.current = null; }
+      if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    };
+  }, []);
+
   // Keep refs in sync with state
   useEffect(() => { likedRef.current = liked; }, [liked]);
   useEffect(() => { savedRef.current = isSaved(article.id); }, [isSaved, article.id]);
@@ -110,8 +119,10 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
     toggleSaved(article.id);
     setSaveFlash(true);
     setTimeout(() => setSaveFlash(false), 700);
-    onSave(1);
-  }, [article.id, toggleSaved, onSave]);
+    // Pass the new saved count after toggle (if currently saved it will be -1, if not it will be +1)
+    const newCount = saved ? prefs.savedArticleIds.length - 1 : prefs.savedArticleIds.length + 1;
+    onSave(newCount);
+  }, [article.id, toggleSaved, onSave, saved, prefs.savedArticleIds.length]);
 
   const handleLike = useCallback(() => {
     setLiked((v) => !v);

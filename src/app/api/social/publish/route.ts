@@ -3,8 +3,20 @@ import { socialPublisher } from "@/lib/social-publisher";
 import { store } from "@/lib/store";
 import { SocialPlatform } from "@/types";
 import { analyticsStore } from "@/lib/analytics-store";
+import { verifyToken } from "@/lib/auth";
+
+function isAdmin(req: NextRequest): boolean {
+  const cookie = req.cookies.get("admin_token")?.value;
+  if (cookie && verifyToken(cookie)) return true;
+  const bearer = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (bearer && verifyToken(bearer)) return true;
+  return false;
+}
 
 export async function POST(req: NextRequest) {
+  if (!isAdmin(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const { articleId, platforms } = await req.json();
     if (!articleId || !platforms?.length) {
@@ -33,7 +45,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!isAdmin(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const posts = socialPublisher.getPosts();
   const stats = socialPublisher.getStats();
   return NextResponse.json({ posts, stats });

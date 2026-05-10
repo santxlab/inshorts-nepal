@@ -45,9 +45,10 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
   const onShare = useCallback(() => update(recordShare), [update]);
   const onPollAnswer = useCallback(() => update(recordPollAnswer), [update]);
 
-  const onSave = useCallback((savedCount: number) => {
+  const onSave = useCallback((currentSavedCount: number) => {
+    // currentSavedCount = actual number of saved articles AFTER the toggle
     update((g) => {
-      if (savedCount >= 20 && !g.badges.includes("collector")) {
+      if (currentSavedCount >= 20 && !g.badges.includes("collector")) {
         const badge = ALL_BADGES.find((b) => b.id === "collector");
         if (badge) {
           setNewBadges((cur) => [...cur, { ...badge, unlockedAt: new Date().toISOString() }]);
@@ -70,8 +71,8 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
   const clearNewBadges = useCallback(() => setNewBadges([]), []);
   const getBadgeById = (id: string) => ALL_BADGES.find((b) => b.id === id);
 
-  if (!loaded) return <>{children}</>;
-
+  // Always render the Provider so children using useGamification() never throw.
+  // Before `loaded`, gami === DEFAULT_GAMIFICATION (safe default, updates on next tick).
   return (
     <GamificationContext.Provider value={{
       gami, onArticleRead, onShare, onPollAnswer, onSave, onAudioListen,

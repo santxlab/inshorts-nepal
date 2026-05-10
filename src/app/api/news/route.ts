@@ -3,25 +3,24 @@ import { store } from "@/lib/store";
 import { fetchAllSources } from "@/lib/rss-fetcher";
 import { TopicId } from "@/types";
 
-// Module-level flag so we only auto-fetch once per serverless instance
-let autoFetchDone = false;
-let autoFetchInProgress = false;
+// Module-level flags so we only auto-fetch once per serverless instance per language
+const autoFetchDone: Record<string, boolean> = {};
+const autoFetchInProgress: Record<string, boolean> = {};
 
 async function ensureFreshArticles(lang: "ne" | "en") {
-  // If already fetched this instance, skip
-  if (autoFetchDone || autoFetchInProgress) return;
+  if (autoFetchDone[lang] || autoFetchInProgress[lang]) return;
 
   const all = store.getArticles(lang);
   // Seed data has ≤ 13 articles — if we're at/near seed count, fetch real RSS
   if (all.length <= 13) {
-    autoFetchInProgress = true;
+    autoFetchInProgress[lang] = true;
     try {
       await fetchAllSources(lang);
-      autoFetchDone = true;
+      autoFetchDone[lang] = true;
     } catch {
       // non-fatal — seed data still shows
     } finally {
-      autoFetchInProgress = false;
+      autoFetchInProgress[lang] = false;
     }
   }
 }

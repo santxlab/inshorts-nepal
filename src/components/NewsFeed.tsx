@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import NewsCard from "./NewsCard";
 import PollCard from "./PollCard";
 import DigestBanner from "./DigestBanner";
-import { NewsArticle, TopicId } from "@/types";
+import { NewsArticle, TopicId, LANGUAGE_CONFIG } from "@/types";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
 import { loadBehaviorProfile, personalizeOrder } from "@/lib/behavior";
 
@@ -32,16 +32,8 @@ export default function NewsFeed({ selectedTopic }: Props) {
   const isOnline = useOnlineStatus();
   const isNepali = prefs.language !== "en";
 
-  // Only Nepali ("ne") gets Nepali RSS feed.
-  // Hindi and all other languages fall back to English RSS since those
-  // RSS sources don't exist separately yet.
-  const langMap: Record<string, "ne" | "en"> = {
-    ne: "ne",
-    en: "en",
-    hi: "en", mai: "en", thr: "en",
-    bho: "en", tam: "en", baj: "en", awa: "en", new: "en",
-  };
-  const rssLang = langMap[prefs.language] ?? "ne";
+  // Use LANGUAGE_CONFIG as single source of truth for RSS feed language mapping
+  const rssLang = LANGUAGE_CONFIG[prefs.language]?.rssLang ?? "ne";
 
   // ── Data fetching ──────────────────────────────────────────
   const fetchNews = useCallback(async () => {

@@ -28,7 +28,10 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   if (!authCheck(req))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { id } = await req.json();
+  // Prefer query param (?id=...) — bodies on DELETE are unreliable across proxies
+  const id = req.nextUrl.searchParams.get("id")
+    || await req.json().then((b) => b.id).catch(() => null);
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const ok = store.deleteArticle(id);
   return NextResponse.json({ success: ok });
 }

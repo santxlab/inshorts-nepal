@@ -4,8 +4,13 @@ import { fetchAllSources } from "@/lib/rss-fetcher";
 // Vercel Cron Job — runs every 30 minutes
 // Vercel automatically calls this with a valid authorization header
 export async function GET(req: NextRequest) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    // CRON_SECRET not configured — reject all requests to prevent accidental open access
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+  }
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

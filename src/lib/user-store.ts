@@ -3,6 +3,9 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AppUser } from "@/contexts/AuthContext";
 
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+  console.error("[SECURITY] JWT_SECRET env var is not set — using insecure default!");
+}
 const JWT_SECRET = process.env.JWT_SECRET || "inshorts-nepal-secret-2025";
 
 interface StoredUser {
