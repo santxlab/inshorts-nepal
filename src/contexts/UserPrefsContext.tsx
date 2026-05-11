@@ -1,10 +1,11 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
-import { UserPrefs, DEFAULT_PREFS, TopicId, Province, Language } from "@/types";
+import { UserPrefs, DEFAULT_PREFS, TopicId, Province, Language, RegionId } from "@/types";
 
 interface UserPrefsContextType {
   prefs: UserPrefs;
   setLanguage: (lang: Language) => void;
+  setRegion: (r: RegionId) => void;
   setProvince: (p: Province | null) => void;
   setDistrict: (d: string | null) => void;
   setCity: (c: string | null) => void;
@@ -44,6 +45,7 @@ export function UserPrefsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setLanguage = (language: Language) => update({ language });
+  const setRegion = (region: RegionId) => update({ region });
   const setProvince = (province: Province | null) => update({ province, district: null, city: null });
   const setDistrict = (district: string | null) => update({ district, city: null });
   const setCity = (city: string | null) => update({ city });
@@ -70,7 +72,7 @@ export function UserPrefsProvider({ children }: { children: ReactNode }) {
 
   return (
     <UserPrefsContext.Provider value={{
-      prefs, setLanguage, setProvince, setDistrict, setCity,
+      prefs, setLanguage, setRegion, setProvince, setDistrict, setCity,
       toggleTopic, setTopics, completeOnboarding, setNotifications,
       toggleSaved, isSaved, resetPrefs, loaded,
     }}>

@@ -10,6 +10,8 @@ import {
   loadBehaviorProfile,
   saveBehaviorProfile,
 } from "@/lib/behavior";
+import { getFallbackImage } from "@/lib/image-fallbacks";
+import { recordBookmark, recordShare as recordEngShare } from "@/lib/engagement";
 
 interface Props {
   article: NewsArticle;
@@ -52,7 +54,11 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
   const isNepali = prefs.language !== "en";
   const topicConfig = article.topics?.[0] ? getTopicById(article.topics[0]) : null;
-  const hasImage = !!article.imageUrl && !imgError;
+  // Use article image; if missing/broken, use curated category fallback
+  const displayImage = imgError || !article.imageUrl
+    ? getFallbackImage(article.id, article.topics ?? [], article.category)
+    : article.imageUrl;
+  const hasImage = true; // always show an image with fallback system
 
   // Cleanup on unmount
   useEffect(() => {
@@ -104,6 +110,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
     setTimeout(() => setSaveFlash(false), 700);
     const newCount = saved ? prefs.savedArticleIds.length - 1 : prefs.savedArticleIds.length + 1;
     onSave(newCount);
+    if (!saved) recordBookmark(); // track for engagement prompts
   }, [article.id, toggleSaved, onSave, saved, prefs.savedArticleIds.length]);
 
   const handleLike = useCallback(() => {
@@ -115,6 +122,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
   const handleShare = useCallback(async () => {
     onShare();
     sharedRef.current = true;
+    recordEngShare(); // track for engagement prompts
     const text = `${article.title}\n\n${article.summary}\n\n${article.sourceUrl}`;
     try {
       if (navigator.share) await navigator.share({ title: article.title, text, url: article.sourceUrl });
@@ -184,29 +192,16 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
     >
       {/* ── IMAGE SECTION (top ~52%) ────────────────────────── */}
       <div className="relative flex-shrink-0" style={{ height: "52%" }}>
-        {hasImage ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={article.imageUrl}
-              alt={article.title}
-              className="w-full h-full object-cover"
-              onError={() => setImgError(true)}
-            />
-            {/* Subtle bottom fade to blend into content */}
-            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0f0f0f] to-transparent" />
-          </>
-        ) : (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{
-              background: `linear-gradient(135deg, ${topicConfig?.color ?? "#1a1a2e"}22, ${topicConfig?.color ?? "#16213e"}44)`,
-              borderBottom: `1px solid ${topicConfig?.color ?? "#333"}33`,
-            }}
-          >
-            <span className="text-7xl opacity-30">{topicConfig?.emoji ?? "📰"}</span>
-          </div>
-        )}
+        {/* Always show image — uses curated fallback if source image missing/broken */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={displayImage}
+          alt={article.title}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
+        {/* Subtle bottom fade */}
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0f0f0f] to-transparent" />
 
         {/* Breaking badge */}
         {article.isBreaking && (
@@ -388,12 +383,10 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
             </button>
 
             {/* Image in detail */}
-            {hasImage && (
-              <div className="rounded-2xl overflow-hidden mb-4" style={{ height: 200 }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={article.imageUrl} alt={article.title} className="w-full h-full object-cover" />
-              </div>
-            )}
+            <div className="rounded-2xl overflow-hidden mb-4" style={{ height: 200 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={displayImage} alt={article.title} className="w-full h-full object-cover" />
+            </div>
 
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {topicConfig && (

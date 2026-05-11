@@ -43,11 +43,33 @@ export type Category =
   | "entertainment" | "health" | "world" | "education";
 
 // ═══════════════════════════════════════════
+// REGION
+// ═══════════════════════════════════════════
+export type RegionId =
+  | "nepal" | "kathmandu" | "pokhara" | "madhesh"
+  | "lumbini" | "koshi" | "gandaki" | "karnali"
+  | "sudurpashchim" | "international";
+
+export const REGION_CONFIG: Record<RegionId, { label: string; labelNe: string; emoji: string }> = {
+  nepal:          { label: "All Nepal",       labelNe: "सम्पूर्ण नेपाल",    emoji: "🇳🇵" },
+  kathmandu:      { label: "Kathmandu",       labelNe: "काठमाडौं",           emoji: "🏛️" },
+  pokhara:        { label: "Pokhara",         labelNe: "पोखरा",              emoji: "⛵" },
+  madhesh:        { label: "Madhesh",         labelNe: "मधेश",               emoji: "🌾" },
+  lumbini:        { label: "Lumbini",         labelNe: "लुम्बिनी",           emoji: "🌸" },
+  koshi:          { label: "Koshi",           labelNe: "कोशी",               emoji: "🌊" },
+  gandaki:        { label: "Gandaki",         labelNe: "गण्डकी",             emoji: "🏔️" },
+  karnali:        { label: "Karnali",         labelNe: "कर्णाली",            emoji: "🏞️" },
+  sudurpashchim:  { label: "Sudurpashchim",   labelNe: "सुदूरपश्चिम",        emoji: "🌄" },
+  international:  { label: "International",   labelNe: "अन्तर्राष्ट्रिय",    emoji: "🌏" },
+};
+
+// ═══════════════════════════════════════════
 // USER PREFERENCES
 // ═══════════════════════════════════════════
 export interface UserPrefs {
   language: Language;
-  province: Province | null;
+  region: RegionId;
+  province: Province | null;    // kept for backwards compat
   district: string | null;
   city: string | null;
   topics: TopicId[];
@@ -58,6 +80,7 @@ export interface UserPrefs {
 
 export const DEFAULT_PREFS: UserPrefs = {
   language: "ne",
+  region: "nepal",
   province: null,
   district: null,
   city: null,

@@ -6,6 +6,7 @@ import DigestBanner from "./DigestBanner";
 import { NewsArticle, TopicId, LANGUAGE_CONFIG } from "@/types";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
 import { loadBehaviorProfile, personalizeOrder } from "@/lib/behavior";
+import { recordSwipe } from "@/lib/engagement";
 
 interface Props {
   selectedTopic: TopicId | null;
@@ -86,7 +87,7 @@ export default function NewsFeed({ selectedTopic }: Props) {
     if (clamped === currentIndex) return;
     isNavigating.current = true;
     setCurrentIndex(clamped);
-    // Unlock after transition completes
+    recordSwipe(); // track for engagement prompts
     setTimeout(() => { isNavigating.current = false; }, 380);
   }, [currentIndex]);
 
@@ -136,21 +137,43 @@ export default function NewsFeed({ selectedTopic }: Props) {
     }
   }, [currentIndex, navigateTo]);
 
-  // ── Loading / error states ─────────────────────────────────
+  // ── Loading skeleton ───────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-black">
-        <div className="w-16 h-16 rounded-2xl nepal-gradient flex items-center justify-center shadow-2xl animate-pulse">
-          <span className="text-3xl">🇳🇵</span>
+      <div className="flex-1 relative overflow-hidden bg-[#0f0f0f]">
+        {/* Skeleton card */}
+        <div className="absolute inset-0 flex flex-col animate-pulse">
+          {/* Image skeleton */}
+          <div className="flex-shrink-0 bg-white/8" style={{ height: "52%" }} />
+          {/* Content skeleton */}
+          <div className="flex-1 p-4 flex flex-col gap-3 pt-4">
+            <div className="flex gap-2 items-center">
+              <div className="h-3 w-16 bg-white/10 rounded-full" />
+              <div className="h-3 w-10 bg-white/6 rounded-full" />
+            </div>
+            <div className="h-5 w-full bg-white/12 rounded-lg" />
+            <div className="h-5 w-4/5 bg-white/10 rounded-lg" />
+            <div className="h-5 w-3/5 bg-white/8 rounded-lg" />
+            <div className="mt-1 space-y-2">
+              <div className="h-3 w-full bg-white/7 rounded" />
+              <div className="h-3 w-full bg-white/6 rounded" />
+              <div className="h-3 w-2/3 bg-white/5 rounded" />
+            </div>
+            <div className="mt-auto flex gap-2 pt-3">
+              {[1,2,3,4,5,6].map(i => (
+                <div key={i} className="flex-1 h-10 bg-white/6 rounded-xl" />
+              ))}
+            </div>
+          </div>
         </div>
-        <p className="text-gray-300 font-medium text-sm">
-          {isNepali ? "समाचार लोड हुँदैछ..." : "Loading news..."}
-        </p>
-        <div className="flex gap-1.5">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="w-2 h-2 rounded-full bg-red-500 animate-bounce"
-              style={{ animationDelay: `${i * 0.15}s` }} />
-          ))}
+        {/* Loading label */}
+        <div className="absolute bottom-8 left-0 right-0 flex justify-center">
+          <div className="flex items-center gap-2 bg-black/60 px-4 py-2 rounded-full backdrop-blur-sm">
+            <div className="w-3 h-3 rounded-full nepal-gradient animate-pulse" />
+            <span className="text-white/60 text-xs">
+              {isNepali ? "समाचार लोड हुँदैछ..." : "Loading news..."}
+            </span>
+          </div>
         </div>
       </div>
     );

@@ -2,30 +2,33 @@
 import { useState, useEffect } from "react";
 import { TopicId } from "@/types";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
-import { useAuth } from "@/contexts/AuthContext";
 import NewsFeed from "@/components/NewsFeed";
 import TopHeader from "@/components/TopHeader";
 import BottomNav from "@/components/BottomNav";
 import BadgeToast from "@/components/BadgeToast";
 import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
-import AuthScreen from "@/components/auth/AuthScreen";
+import EngagementPrompt from "@/components/EngagementPrompt";
 import SavedPage from "@/components/pages/SavedPage";
 import ProfilePage from "@/components/pages/ProfilePage";
 import { usePushBehaviorSync } from "@/hooks/usePushNotifications";
+import { recordSession } from "@/lib/engagement";
 
 type Tab = "home" | "discover" | "saved" | "profile";
 
 export default function Home() {
   const { prefs, loaded } = useUserPrefs();
-  const { isAuthenticated, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [selectedTopic, setSelectedTopic] = useState<TopicId | null>(null);
 
-  // Keep push notification server updated with latest behavioral topic scores
+  // Keep push notification server updated with behavioral topic scores
   usePushBehaviorSync();
 
-  // Track app open / install
+  // Track session + device install on every app open
   useEffect(() => {
+    // Record session for engagement prompt logic
+    recordSession();
+
+    // Track device for admin analytics
     try {
       let deviceId = localStorage.getItem("_did");
       if (!deviceId) {
@@ -43,7 +46,7 @@ export default function Home() {
   }, []);
 
   // Wait for localStorage to hydrate
-  if (!loaded || authLoading) {
+  if (!loaded) {
     return (
       <div className="h-screen bg-black flex items-center justify-center">
         <div className="nepal-gradient w-16 h-16 rounded-2xl flex items-center justify-center animate-pulse">
@@ -53,12 +56,7 @@ export default function Home() {
     );
   }
 
-  // Show auth screen if not authenticated
-  if (!isAuthenticated) {
-    return <AuthScreen />;
-  }
-
-  // Show onboarding if not completed
+  // Show onboarding if not completed (no auth gate — everyone gets the feed)
   if (!prefs.onboardingCompleted) {
     return <OnboardingWizard />;
   }
@@ -70,6 +68,9 @@ export default function Home() {
       {/* Badge unlock toast */}
       <BadgeToast />
 
+      {/* Deferred engagement / auth prompts */}
+      <EngagementPrompt />
+
       {/* Top header with language + topic chips */}
       <TopHeader
         activeTopics={prefs.topics}
@@ -77,7 +78,7 @@ export default function Home() {
         onTopicFilter={setSelectedTopic}
       />
 
-      {/* Content area (padded for header + bottom nav) */}
+      {/* Content area */}
       <div
         className="flex-1 flex flex-col overflow-hidden"
         style={{ paddingTop: headerHeight, paddingBottom: "60px" }}

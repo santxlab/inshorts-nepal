@@ -1,94 +1,167 @@
 "use client";
 import { useState } from "react";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
-import { Language, LANGUAGE_CONFIG, Province } from "@/types";
-import { PROVINCES } from "@/lib/locations";
-import { TOPICS } from "@/lib/topics-config";
-import LanguageStep from "./steps/LanguageStep";
-import LocationStep from "./steps/LocationStep";
-import TopicsStep from "./steps/TopicsStep";
-import NotificationsStep from "./steps/NotificationsStep";
+import { Language, LANGUAGE_CONFIG, RegionId, REGION_CONFIG } from "@/types";
 
-const STEPS = ["language", "location", "topics", "notifications"] as const;
-type Step = typeof STEPS[number];
+type Step = "language" | "region";
+
+const LANGUAGES: { id: Language; flag: string; name: string; nativeName: string; sub: string }[] = [
+  { id: "ne",  flag: "🇳🇵", name: "Nepali",      nativeName: "नेपाली",              sub: "नेपाली भाषामा समाचार" },
+  { id: "en",  flag: "🇬🇧", name: "English",     nativeName: "English",             sub: "News in English" },
+  { id: "hi",  flag: "🇮🇳", name: "Hindi",       nativeName: "हिन्दी",              sub: "हिन्दी में समाचार" },
+  { id: "mai", flag: "🇳🇵", name: "Maithali",    nativeName: "मैथिली",              sub: "मैथिली भाषाम समाचार" },
+  { id: "bho", flag: "🇳🇵", name: "Bhojpuri",    nativeName: "भोजपुरी",            sub: "भोजपुरी में खबर" },
+  { id: "thr", flag: "🇳🇵", name: "Tharu",       nativeName: "थारू",                sub: "थारू भाषामा समाचार" },
+  { id: "awa", flag: "🇳🇵", name: "Awadhi",      nativeName: "अवधी",               sub: "अवधी में समाचार" },
+  { id: "new", flag: "🇳🇵", name: "Nepal Bhasa", nativeName: "नेपाल भाषा",         sub: "नेवारी भाषाया न्हूगु" },
+  { id: "tam", flag: "🇳🇵", name: "Tamang",      nativeName: "तामाङ",               sub: "तामाङ भाषामा खबर" },
+  { id: "baj", flag: "🇳🇵", name: "Bajjika",     nativeName: "बज्जिका",            sub: "बज्जिका में खबर" },
+];
+
+const REGIONS: { id: RegionId }[] = [
+  { id: "nepal" },
+  { id: "kathmandu" },
+  { id: "madhesh" },
+  { id: "lumbini" },
+  { id: "koshi" },
+  { id: "gandaki" },
+  { id: "karnali" },
+  { id: "sudurpashchim" },
+  { id: "international" },
+];
 
 export default function OnboardingWizard() {
-  const { prefs, setLanguage, setProvince, setDistrict, setCity, setTopics, setNotifications, completeOnboarding } = useUserPrefs();
+  const { prefs, setLanguage, setRegion, completeOnboarding } = useUserPrefs();
   const [step, setStep] = useState<Step>("language");
-  const [animDir, setAnimDir] = useState<"forward" | "back">("forward");
+  const [animating, setAnimating] = useState(false);
 
-  const currentIndex = STEPS.indexOf(step);
-
-  const goNext = () => {
-    if (currentIndex < STEPS.length - 1) {
-      setAnimDir("forward");
-      setStep(STEPS[currentIndex + 1]);
-    } else {
-      completeOnboarding();
-    }
+  const pickLanguage = (lang: Language) => {
+    setLanguage(lang);
+    setAnimating(true);
+    setTimeout(() => { setStep("region"); setAnimating(false); }, 250);
   };
 
-  const goBack = () => {
-    if (currentIndex > 0) {
-      setAnimDir("back");
-      setStep(STEPS[currentIndex - 1]);
-    }
+  const pickRegion = (region: RegionId) => {
+    setRegion(region);
+    completeOnboarding();
   };
+
+  const skipRegion = () => {
+    completeOnboarding();
+  };
+
+  const isNepali = prefs.language !== "en";
 
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-br from-[#DC143C] via-[#8B0000] to-[#003893] flex flex-col">
-      {/* Progress dots */}
-      <div className="flex justify-center gap-2 pt-12 pb-4">
-        {STEPS.map((s, i) => (
-          <div
-            key={s}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              i === currentIndex
-                ? "w-8 bg-white"
-                : i < currentIndex
-                ? "w-2 bg-white/60"
-                : "w-2 bg-white/25"
-            }`}
-          />
-        ))}
+    <div
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+      style={{ background: "linear-gradient(160deg, #0a0a0a 0%, #1a0a0a 40%, #0a0a1a 100%)" }}
+    >
+      {/* Brand header */}
+      <div className="flex-shrink-0 px-6 pt-12 pb-4 text-center">
+        <div className="inline-flex items-center gap-3 mb-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon-192.png" alt="InShorts Nepal" className="w-10 h-10 rounded-xl shadow-lg" />
+          <span className="text-white font-black text-xl tracking-tight">InShorts <span className="text-red-500">Nepal</span></span>
+        </div>
+
+        {step === "language" ? (
+          <>
+            <h2 className="text-white text-2xl font-black mb-1">Choose your language</h2>
+            <p className="text-white/45 text-sm">आफ्नो भाषा छान्नुहोस्</p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-white text-2xl font-black mb-1">Your region?</h2>
+            <p className="text-white/45 text-sm">
+              {isNepali ? "आफ्नो क्षेत्र छान्नुहोस्" : "Get local news tailored to you"}
+            </p>
+          </>
+        )}
+
+        {/* Step dots */}
+        <div className="flex justify-center gap-2 mt-4">
+          {(["language", "region"] as Step[]).map((s) => (
+            <div
+              key={s}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                s === step ? "w-8 bg-red-500" : step === "region" && s === "language" ? "w-2 bg-white/40" : "w-2 bg-white/20"
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Step content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Content */}
+      <div
+        className={`flex-1 overflow-y-auto px-4 pb-6 transition-opacity duration-200 ${animating ? "opacity-0" : "opacity-100"}`}
+      >
         {step === "language" && (
-          <LanguageStep
-            selected={prefs.language}
-            onSelect={setLanguage}
-            onNext={goNext}
-          />
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            {LANGUAGES.map((lang) => {
+              const selected = prefs.language === lang.id;
+              return (
+                <button
+                  key={lang.id}
+                  onClick={() => pickLanguage(lang.id)}
+                  className={`relative flex flex-col items-center text-center p-4 rounded-2xl border transition-all active:scale-95 ${
+                    selected
+                      ? "bg-red-600/20 border-red-500 shadow-lg shadow-red-500/20"
+                      : "bg-white/5 border-white/10 hover:border-white/25"
+                  }`}
+                >
+                  <span className="text-4xl mb-2">{lang.flag}</span>
+                  <span className="text-white font-black text-base leading-tight">{lang.nativeName}</span>
+                  <span className="text-white/40 text-[11px] mt-0.5">{lang.name}</span>
+                  {selected && (
+                    <span className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">✓</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         )}
-        {step === "location" && (
-          <LocationStep
-            province={prefs.province}
-            district={prefs.district}
-            city={prefs.city}
-            onProvince={setProvince}
-            onDistrict={setDistrict}
-            onCity={setCity}
-            onNext={goNext}
-            onBack={goBack}
-          />
+
+        {step === "region" && (
+          <>
+            <div className="grid grid-cols-3 gap-2.5 pt-2">
+              {REGIONS.map(({ id }) => {
+                const cfg = REGION_CONFIG[id];
+                const selected = prefs.region === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => pickRegion(id)}
+                    className={`flex flex-col items-center text-center p-3 rounded-2xl border transition-all active:scale-95 ${
+                      selected
+                        ? "bg-red-600/20 border-red-500"
+                        : "bg-white/5 border-white/10 hover:border-white/25"
+                    }`}
+                  >
+                    <span className="text-3xl mb-1.5">{cfg.emoji}</span>
+                    <span className="text-white font-bold text-[12px] leading-tight">
+                      {isNepali ? cfg.labelNe : cfg.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={skipRegion}
+              className="w-full mt-5 py-3 text-white/35 text-sm font-medium"
+            >
+              {isNepali ? "छोड्नुहोस् →" : "Skip for now →"}
+            </button>
+          </>
         )}
-        {step === "topics" && (
-          <TopicsStep
-            selected={prefs.topics}
-            onTopics={setTopics}
-            onNext={goNext}
-            onBack={goBack}
-          />
-        )}
-        {step === "notifications" && (
-          <NotificationsStep
-            onEnable={() => { setNotifications(true); goNext(); }}
-            onSkip={() => { setNotifications(false); goNext(); }}
-            onBack={goBack}
-          />
-        )}
+      </div>
+
+      {/* Bottom brand strip */}
+      <div className="flex-shrink-0 pb-8 text-center">
+        <p className="text-white/20 text-[11px]">
+          {isNepali ? "नेपालको नम्बर १ समाचार एप" : "Nepal's premier news app"}
+        </p>
       </div>
     </div>
   );
