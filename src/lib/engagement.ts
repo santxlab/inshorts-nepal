@@ -79,15 +79,29 @@ export function markPromptShown(promptId: string): void {
 }
 
 export type PromptId =
-  | "save_prefs"        // after 10 swipes
-  | "create_account"    // after 2nd session
-  | "sync_bookmarks"    // after 3 bookmarks
-  | "share_app"         // after 1st share
-  | "smart_recs"        // after 20 swipes
-  | "streak_start";     // after 3rd session
+  | "save_prefs"           // after 10 swipes
+  | "create_account"       // after 2nd session
+  | "sync_bookmarks"       // after 3 bookmarks
+  | "share_app"            // after 1st share
+  | "smart_recs"           // after 20 swipes
+  | "streak_start"         // after 3rd session
+  | "enable_notifications"; // after 5 swipes on 2nd+ session
 
 export function getNextPrompt(state: EngagementState): PromptId | null {
   const shown = new Set(state.promptsShown);
+
+  // Notifications prompt early — only after user has shown real engagement (2nd session + 5 swipes)
+  // Also only if browser supports it and permission not yet granted
+  if (
+    state.sessions >= 2 &&
+    state.totalSwipes >= 5 &&
+    !shown.has("enable_notifications") &&
+    typeof window !== "undefined" &&
+    "Notification" in window &&
+    Notification.permission === "default"
+  ) {
+    return "enable_notifications";
+  }
 
   if (state.totalSwipes >= 10 && !shown.has("save_prefs")) return "save_prefs";
   if (state.sessions >= 2 && !shown.has("create_account")) return "create_account";

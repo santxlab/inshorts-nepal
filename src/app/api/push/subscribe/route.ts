@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    pushManager.saveSubscription(pushSub);
+    await pushManager.saveSubscription(pushSub);
 
     // If client sent behavioral topic scores, persist them server-side for targeting
     if (topicScores && typeof topicScores === "object") {
@@ -37,7 +37,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const { endpoint } = await req.json();
     if (!endpoint) return NextResponse.json({ error: "endpoint required" }, { status: 400 });
-    pushManager.removeSubscription(endpoint);
+    await pushManager.removeSubscription(endpoint);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -47,7 +47,7 @@ export async function DELETE(req: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     vapidPublicKey: pushManager.getVapidPublicKey(),
-    subscriberCount: pushManager.getSubscriptionCount(),
+    subscriberCount: await pushManager.getSubscriptionCount(),
     dailyStats: pushManager.getDailyStats(),
   });
 }

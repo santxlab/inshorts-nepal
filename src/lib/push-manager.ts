@@ -1,38 +1,46 @@
-// Push notification manager — behavior-aware targeting with daily frequency cap
-import { PushSubscription, PushNotificationLog, TopicId } from "@/types";
+// Push notification manager — behavior-aware targeting with daily frequency cap.
+// Subscriptions are persisted in MongoDB (via mongoose).
+// Falls back to in-memory map if MONGODB_URI is not configured.
+import type { PushSubscription, PushNotificationLog, TopicId } from "@/types";
+import { connectDB } from "./db";
+import { PushSubscriptionModel } from "@/models/PushSubscriptionModel";
 
-const subscriptions = new Map<string, PushSubscription>(); // endpoint → subscription
-const logs: PushNotificationLog[] = [];
+// ── In-memory fallback (used when MongoDB is unavailable) ─────────────────────
+const memSubs = new Map<string, PushSubscription>();
 
-// Per-subscriber daily send tracking (resets at midnight)
-// key = endpoint, value = { date: "YYYY-MM-DD", count: number }
+// Per-subscriber daily send tracking (in-memory; resets on cold start — acceptable)
 const dailySentMap = new Map<string, { date: string; count: number }>();
 
-// Per-subscriber behavioral topic scores (updated from client)
-// key = endpoint, value = Record<TopicId, number>
+// Per-subscriber behavioral topic scores (updated from client; in-memory)
 const subscriberBehaviorScores = new Map<string, Record<string, number>>();
 
-const DAILY_PUSH_CAP = 5; // max non-breaking notifications per subscriber per day
+const logs: PushNotificationLog[] = [];
+
+const DAILY_PUSH_CAP = 5;
 
 // VAPID keys — generate with: npx web-push generate-vapid-keys
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@inshortsnepal.org";
+const VAPID_SUBJECT    = process.env.VAPID_SUBJECT    ?? "mailto:admin@inshortsnepal.org";
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "";
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  return new Date().toISOString().slice(0, 10);
 }
 
-/** Returns true if we can send to this subscriber right now (cap not exceeded). */
+async function isDbAvailable(): Promise<boolean> {
+  const conn = await connectDB();
+  return conn !== null;
+}
+
+/** Whether the daily cap allows sending to this endpoint right now. */
 function canSendToSubscriber(endpoint: string, isBreaking: boolean): boolean {
-  if (isBreaking) return true; // breaking news always goes through
+  if (isBreaking) return true;
   const today = todayStr();
   const rec = dailySentMap.get(endpoint);
-  if (!rec || rec.date !== today) return true; // new day or first send
+  if (!rec || rec.date !== today) return true;
   return rec.count < DAILY_PUSH_CAP;
 }
 
-/** Increments the daily counter for a subscriber. */
 function incrementDailyCount(endpoint: string): void {
   const today = todayStr();
   const rec = dailySentMap.get(endpoint);
@@ -43,10 +51,6 @@ function incrementDailyCount(endpoint: string): void {
   }
 }
 
-/**
- * Behavioral relevance score for a subscriber against an article's topics.
- * Returns 0–100. If no behavioral data, defaults to 50 (neutral).
- */
 function behaviorRelevanceScore(endpoint: string, topics: TopicId[]): number {
   const scores = subscriberBehaviorScores.get(endpoint);
   if (!scores || topics.length === 0) return 50;
@@ -55,48 +59,105 @@ function behaviorRelevanceScore(endpoint: string, topics: TopicId[]): number {
 }
 
 export const pushManager = {
-  // ─── Subscription management ─────────────────────────────────────────────
-  saveSubscription(sub: PushSubscription): void {
-    subscriptions.set(sub.endpoint, sub);
+  // ── Subscription management ───────────────────────────────────────────────
+  async saveSubscription(sub: PushSubscription): Promise<void> {
+    const dbOk = await isDbAvailable();
+    if (dbOk) {
+      try {
+        await PushSubscriptionModel.findOneAndUpdate(
+          { endpoint: sub.endpoint },
+          {
+            userId:   sub.userId,
+            endpoint: sub.endpoint,
+            keys:     sub.keys,
+            topics:   sub.topics,
+            language: sub.language,
+          },
+          { upsert: true, new: true }
+        );
+        return;
+      } catch (err) {
+        console.error("[pushManager] DB save failed, using memory fallback:", err);
+      }
+    }
+    memSubs.set(sub.endpoint, sub);
   },
 
-  removeSubscription(endpoint: string): void {
-    subscriptions.delete(endpoint);
+  async removeSubscription(endpoint: string): Promise<void> {
     dailySentMap.delete(endpoint);
     subscriberBehaviorScores.delete(endpoint);
+    const dbOk = await isDbAvailable();
+    if (dbOk) {
+      try {
+        await PushSubscriptionModel.deleteOne({ endpoint });
+        return;
+      } catch { /* fallthrough */ }
+    }
+    memSubs.delete(endpoint);
   },
 
-  /** Called by the client to keep server-side behavioral scores in sync. */
   updateSubscriberBehavior(endpoint: string, topicScores: Record<string, number>): void {
     subscriberBehaviorScores.set(endpoint, topicScores);
+    // Best-effort persist to DB in background
+    connectDB().then((conn) => {
+      if (!conn) return;
+      PushSubscriptionModel.updateOne({ endpoint }, { topicScores }).catch(() => {});
+    });
   },
 
-  getSubscriptions(filter?: {
+  async getSubscriptions(filter?: {
     topics?: TopicId[];
     language?: string;
-    minBehaviorScore?: number; // 0-100, filter by behavioral interest
-    articleTopics?: TopicId[]; // used with minBehaviorScore
-  }): PushSubscription[] {
-    let all = [...subscriptions.values()];
+    minBehaviorScore?: number;
+    articleTopics?: TopicId[];
+  }): Promise<PushSubscription[]> {
+    let all: PushSubscription[] = [];
 
-    if (filter?.language) {
-      all = all.filter((s) => s.language === filter.language);
+    const dbOk = await isDbAvailable();
+    if (dbOk) {
+      try {
+        const query: Record<string, unknown> = {};
+        if (filter?.language) query.language = filter.language;
+        if (filter?.topics && filter.topics.length > 0) {
+          query.topics = { $in: filter.topics };
+        }
+        const docs = await PushSubscriptionModel.find(query).lean();
+        all = docs.map((d) => ({
+          userId:   d.userId,
+          endpoint: d.endpoint,
+          keys:     d.keys as { p256dh: string; auth: string },
+          topics:   d.topics as TopicId[],
+          language: d.language,
+          createdAt: (d as { createdAt: Date }).createdAt?.toISOString() ?? "",
+        }));
+      } catch (err) {
+        console.error("[pushManager] DB query failed, using memory fallback:", err);
+        all = [...memSubs.values()];
+      }
+    } else {
+      all = [...memSubs.values()];
+      if (filter?.language) all = all.filter((s) => s.language === filter.language);
+      if (filter?.topics?.length) all = all.filter((s) => s.topics.some((t) => filter.topics!.includes(t)));
     }
-    // Static topic filter: subscriber opted into at least one matching topic
-    if (filter?.topics && filter.topics.length > 0) {
-      all = all.filter((s) => s.topics.some((t) => filter.topics!.includes(t)));
-    }
-    // Behavioral filter: only subscribers who score above threshold for article topics
-    if (filter?.minBehaviorScore !== undefined && filter.articleTopics && filter.articleTopics.length > 0) {
+
+    // Behavioral filter (always in-memory)
+    if (filter?.minBehaviorScore !== undefined && filter?.articleTopics?.length) {
       all = all.filter(
         (s) => behaviorRelevanceScore(s.endpoint, filter.articleTopics!) >= filter.minBehaviorScore!
       );
     }
+
     return all;
   },
 
-  getSubscriptionCount(): number {
-    return subscriptions.size;
+  async getSubscriptionCount(): Promise<number> {
+    const dbOk = await isDbAvailable();
+    if (dbOk) {
+      try {
+        return await PushSubscriptionModel.countDocuments();
+      } catch { /* fallthrough */ }
+    }
+    return memSubs.size;
   },
 
   getDailyStats(): { totalSentToday: number; capsReached: number } {
@@ -112,30 +173,24 @@ export const pushManager = {
     return { totalSentToday, capsReached };
   },
 
-  // ─── Core send ───────────────────────────────────────────────────────────
+  // ── Core send ─────────────────────────────────────────────────────────────
   async sendToSubscribers(
-    payload: {
-      title: string;
-      body: string;
-      url?: string;
-      icon?: string;
-      tag?: string;
-    },
+    payload: { title: string; body: string; url?: string; icon?: string; tag?: string },
     options: {
       filter?: { topics?: TopicId[]; language?: string };
-      isBreaking?: boolean;       // exempt from daily cap
-      articleTopics?: TopicId[];  // for behavioral relevance filtering
-      minBehaviorScore?: number;  // default 40: only send if score >= this
+      isBreaking?: boolean;
+      articleTopics?: TopicId[];
+      minBehaviorScore?: number;
     } = {}
   ): Promise<{ sent: number; failed: number; skippedCap: number }> {
     if (!VAPID_PRIVATE_KEY) {
-      console.warn("VAPID keys not configured — push notifications disabled");
+      console.warn("[pushManager] VAPID keys not configured — push disabled");
       return { sent: 0, failed: 0, skippedCap: 0 };
     }
 
     const { isBreaking = false, articleTopics, minBehaviorScore = 40 } = options;
 
-    const targets = this.getSubscriptions({
+    const targets = await this.getSubscriptions({
       ...options.filter,
       articleTopics,
       minBehaviorScore: articleTopics?.length ? minBehaviorScore : undefined,
@@ -147,7 +202,7 @@ export const pushManager = {
 
     const webpush = await import("web-push").catch(() => null);
     if (!webpush) {
-      console.warn("web-push not installed");
+      console.warn("[pushManager] web-push not installed");
       return { sent: 0, failed: 0, skippedCap: 0 };
     }
 
@@ -155,7 +210,6 @@ export const pushManager = {
 
     await Promise.allSettled(
       targets.map(async (sub) => {
-        // ── Daily cap check ──
         if (!canSendToSubscriber(sub.endpoint, isBreaking)) {
           skippedCap++;
           return;
@@ -165,25 +219,25 @@ export const pushManager = {
             { endpoint: sub.endpoint, keys: sub.keys },
             JSON.stringify({
               title: payload.title,
-              body: payload.body,
-              url: payload.url ?? "/",
-              icon: payload.icon ?? "/icon-512.png",
-              tag: payload.tag,
+              body:  payload.body,
+              url:   payload.url ?? "/",
+              icon:  payload.icon ?? "/icon-512.png",
+              tag:   payload.tag,
             })
           );
           incrementDailyCount(sub.endpoint);
           sent++;
         } catch (err: unknown) {
           if ((err as { statusCode?: number }).statusCode === 410) {
-            this.removeSubscription(sub.endpoint);
+            await this.removeSubscription(sub.endpoint);
           }
           failed++;
         }
       })
     );
 
-    // Log the notification
-    const log: PushNotificationLog = {
+    // Log
+    logs.unshift({
       id: `push-${Date.now()}`,
       title: payload.title,
       body: payload.body,
@@ -191,58 +245,23 @@ export const pushManager = {
       recipientCount: sent,
       openCount: 0,
       targetTopics: options.filter?.topics ?? [],
-    };
-    logs.unshift(log);
+    });
 
     return { sent, failed, skippedCap };
   },
 
-  // ─── Specialised senders ─────────────────────────────────────────────────
-
-  /** Breaking news — bypasses daily cap, uses behavioral scoring to target interested subscribers. */
-  async sendBreakingNewsAlert(
-    articleId: string,
-    title: string,
-    summary: string,
-    topics: TopicId[]
-  ) {
+  // ── Specialised senders ───────────────────────────────────────────────────
+  async sendBreakingNewsAlert(articleId: string, title: string, summary: string, topics: TopicId[]) {
     return this.sendToSubscribers(
-      {
-        title: `🚨 ${title}`,
-        body: summary.slice(0, 100),
-        url: `/news/${articleId}`,
-        tag: `breaking-${articleId}`,
-      },
-      {
-        filter: { topics }, // static interest filter
-        isBreaking: true,   // exempt from daily cap
-        articleTopics: topics,
-        minBehaviorScore: 30, // lower threshold for breaking
-      }
+      { title: `🚨 ${title}`, body: summary.slice(0, 100), url: `/news/${articleId}`, tag: `breaking-${articleId}` },
+      { filter: { topics }, isBreaking: true, articleTopics: topics, minBehaviorScore: 30 }
     );
   },
 
-  /** Regular important story — respects daily cap, behaviorally targeted. */
-  async sendTopStoryAlert(
-    articleId: string,
-    title: string,
-    summary: string,
-    topics: TopicId[],
-    language: string
-  ) {
+  async sendTopStoryAlert(articleId: string, title: string, summary: string, topics: TopicId[], language: string) {
     return this.sendToSubscribers(
-      {
-        title: `📰 ${title}`,
-        body: summary.slice(0, 100),
-        url: `/news/${articleId}`,
-        tag: `story-${articleId}`,
-      },
-      {
-        filter: { topics, language },
-        isBreaking: false,
-        articleTopics: topics,
-        minBehaviorScore: 55, // only subscribers with genuine interest
-      }
+      { title: `📰 ${title}`, body: summary.slice(0, 100), url: `/news/${articleId}`, tag: `story-${articleId}` },
+      { filter: { topics, language }, articleTopics: topics, minBehaviorScore: 55 }
     );
   },
 
@@ -250,13 +269,10 @@ export const pushManager = {
     return this.sendToSubscribers(
       {
         title: language === "ne" ? "☀️ बिहानको समाचार संक्षेप" : "☀️ Your Morning Nepal Brief",
-        body: language === "ne"
-          ? "आजका शीर्ष समाचारहरू पढ्न तयार हुनुहोस्"
-          : "Top stories personalized for you",
-        url: "/",
-        tag: "morning-digest",
+        body:  language === "ne" ? "आजका शीर्ष समाचारहरू पढ्न तयार हुनुहोस्" : "Top stories personalized for you",
+        url: "/", tag: "morning-digest",
       },
-      { filter: { language }, isBreaking: false }
+      { filter: { language } }
     );
   },
 
@@ -264,19 +280,16 @@ export const pushManager = {
     return this.sendToSubscribers(
       {
         title: language === "ne" ? "🌙 साँझको समाचार संक्षेप" : "🌙 Evening Nepal Brief",
-        body: language === "ne"
-          ? "दिनभरका महत्त्वपूर्ण समाचारहरू"
-          : "What mattered today in Nepal",
-        url: "/",
-        tag: "evening-digest",
+        body:  language === "ne" ? "दिनभरका महत्त्वपूर्ण समाचारहरू" : "What mattered today in Nepal",
+        url: "/", tag: "evening-digest",
       },
-      { filter: { language }, isBreaking: false }
+      { filter: { language } }
     );
   },
 
-  /** Streak reminder — only if user hasn't read today. Non-breaking. */
   async sendStreakReminder(endpoint: string, currentStreak: number, language: string) {
-    const sub = subscriptions.get(endpoint);
+    const subs = await this.getSubscriptions();
+    const sub = subs.find((s) => s.endpoint === endpoint);
     if (!sub) return;
     if (!canSendToSubscriber(endpoint, false)) return;
 
@@ -291,18 +304,14 @@ export const pushManager = {
           title: language === "ne"
             ? `🔥 आजको लगातार नतोड्नुहोस् (${currentStreak} दिन)!`
             : `🔥 Keep your ${currentStreak}-day streak alive!`,
-          body: language === "ne"
-            ? "आज अझै एउटा समाचार पढ्नुहोस्।"
-            : "Read at least one story today.",
-          url: "/",
-          tag: "streak-reminder",
-          icon: "/icon-512.png",
+          body: language === "ne" ? "आज अझै एउटा समाचार पढ्नुहोस्।" : "Read at least one story today.",
+          url: "/", tag: "streak-reminder", icon: "/icon-512.png",
         })
       );
       incrementDailyCount(endpoint);
     } catch (err: unknown) {
       if ((err as { statusCode?: number }).statusCode === 410) {
-        this.removeSubscription(endpoint);
+        await this.removeSubscription(endpoint);
       }
     }
   },

@@ -5,6 +5,7 @@ import { useUserPrefs } from "@/contexts/UserPrefsContext";
 import {
   loadEngagement, markPromptShown, getNextPrompt, PromptId,
 } from "@/lib/engagement";
+import { subscribeToNotifications } from "@/hooks/usePushNotifications";
 
 interface PromptConfig {
   emoji: string;
@@ -16,10 +17,22 @@ interface PromptConfig {
   ctaNe: string;
   secondary: string;
   secondaryNe: string;
-  action: "signup" | "signin" | "dismiss";
+  action: "signup" | "signin" | "dismiss" | "notifications";
 }
 
 const PROMPTS: Record<PromptId, PromptConfig> = {
+  enable_notifications: {
+    emoji: "🔔",
+    title: "Breaking news, instantly",
+    titleNe: "ताजा समाचार तुरुन्तै पाउनुहोस्",
+    body: "Get notified the moment big stories break in Nepal — no app refresh needed.",
+    bodyNe: "नेपालका ठूला समाचार तुरुन्तै पाउनुहोस् — एप खोल्न पर्दैन।",
+    cta: "Enable notifications",
+    ctaNe: "सूचना सक्षम गर्नुहोस्",
+    secondary: "Not now",
+    secondaryNe: "अहिले होइन",
+    action: "notifications",
+  },
   save_prefs: {
     emoji: "⚡",
     title: "Save your preferences",
@@ -99,12 +112,12 @@ export default function EngagementPrompt() {
   const { prefs } = useUserPrefs();
   const [promptId, setPromptId] = useState<PromptId | null>(null);
   const [visible, setVisible] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
 
   const isNepali = prefs.language !== "en";
 
   useEffect(() => {
-    if (isAuthenticated) return; // don't show to signed-in users
-    // Check after 2 seconds so feed loads first
+    if (isAuthenticated) return;
     const t = setTimeout(() => {
       const state = loadEngagement();
       const next = getNextPrompt(state);
@@ -125,8 +138,24 @@ export default function EngagementPrompt() {
     const cfg = promptId ? PROMPTS[promptId] : null;
     if (!cfg) { dismiss(); return; }
 
+    if (cfg.action === "notifications") {
+      // Request browser notification permission then subscribe via VAPID
+      setNotifLoading(true);
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          await subscribeToNotifications("anon", prefs.topics, prefs.language);
+        }
+      } catch {
+        /* browser blocked */
+      } finally {
+        setNotifLoading(false);
+      }
+      dismiss();
+      return;
+    }
+
     if (cfg.action === "dismiss") {
-      // Share app
       try {
         if (navigator.share) {
           await navigator.share({ title: "InShorts Nepal", text: "Nepal's best news app!", url: "https://inshortsnepal.org" });
@@ -135,7 +164,7 @@ export default function EngagementPrompt() {
         }
       } catch { /* cancelled */ }
     }
-    // For signin/signup: could open auth modal, for now just dismiss
+    // For signin/signup: open auth modal in a future update; for now just dismiss
     dismiss();
   };
 
@@ -160,9 +189,13 @@ export default function EngagementPrompt() {
 
         <button
           onClick={handleCta}
-          className="w-full py-3.5 rounded-2xl bg-red-600 text-white font-bold text-base mb-3 active:scale-95 transition-all"
+          disabled={notifLoading}
+          className="w-full py-3.5 rounded-2xl bg-red-600 text-white font-bold text-base mb-3 active:scale-95 transition-all disabled:opacity-60"
         >
-          {isNepali ? cfg.ctaNe : cfg.cta}
+          {notifLoading
+            ? (isNepali ? "सक्षम गर्दैछ..." : "Enabling...")
+            : (isNepali ? cfg.ctaNe : cfg.cta)
+          }
         </button>
         <button
           onClick={dismiss}
