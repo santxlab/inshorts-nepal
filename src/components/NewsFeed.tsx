@@ -19,6 +19,8 @@ export default function NewsFeed({ selectedTopic }: Props) {
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const autoFetchedRef = useRef(false);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Drag state for live follow-finger feel
   const [dragY, setDragY] = useState(0);
@@ -37,11 +39,11 @@ export default function NewsFeed({ selectedTopic }: Props) {
   const rssLang = LANGUAGE_CONFIG[prefs.language]?.rssLang ?? "ne";
 
   // ── Data fetching ──────────────────────────────────────────
-  const fetchNews = useCallback(async () => {
-    setLoading(true);
+  const fetchNews = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ lang: rssLang, limit: "40" });
+      const params = new URLSearchParams({ lang: rssLang, limit: "60" });
       if (selectedTopic) params.set("topic", selectedTopic);
       const res = await fetch(`/api/news?${params}`);
       if (!res.ok) throw new Error("Failed");
@@ -50,10 +52,16 @@ export default function NewsFeed({ selectedTopic }: Props) {
       const profile = loadBehaviorProfile();
       const personalized = personalizeOrder<NewsArticle>(fetched, profile);
       setArticles(personalized);
+
+      // If server says it's fetching more in background, poll after 8s
+      if (data.fetchingMore && fetched.length < 20) {
+        if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+        pollTimerRef.current = setTimeout(() => fetchNews(true), 8000);
+      }
     } catch {
       setError(isNepali ? "समाचार लोड गर्न सकिएन।" : "Could not load news.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [rssLang, selectedTopic, isNepali]);
 
@@ -74,11 +82,35 @@ export default function NewsFeed({ selectedTopic }: Props) {
 
   useEffect(() => { fetchNews(); }, [fetchNews]);
 
+  // Cleanup poll timer
+  useEffect(() => {
+    return () => { if (pollTimerRef.current) clearTimeout(pollTimerRef.current); };
+  }, []);
+
   // Reset to top when filter or language changes
   useEffect(() => {
     setCurrentIndex(0);
     setDragY(0);
+    autoFetchedRef.current = false;
   }, [selectedTopic, prefs.language]);
+
+  // ── Auto-fetch more when near end of feed ─────────────────
+  useEffect(() => {
+    if (articles.length === 0) return;
+    const remaining = articles.length - currentIndex;
+    // When fewer than 8 cards left, silently fetch more
+    if (remaining <= 8 && !fetching && !autoFetchedRef.current) {
+      autoFetchedRef.current = true;
+      fetch("/api/fetch-rss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: rssLang }),
+      })
+        .then(() => fetchNews(true))
+        .catch(() => {})
+        .finally(() => { autoFetchedRef.current = false; });
+    }
+  }, [currentIndex, articles.length, fetching, rssLang, fetchNews]);
 
   // ── Navigation ─────────────────────────────────────────────
   const navigateTo = useCallback((index: number, total: number) => {
@@ -88,7 +120,7 @@ export default function NewsFeed({ selectedTopic }: Props) {
     isNavigating.current = true;
     setCurrentIndex(clamped);
     recordSwipe(); // track for engagement prompts
-    setTimeout(() => { isNavigating.current = false; }, 380);
+    setTimeout(() => { isNavigating.current = false; }, 300);
   }, [currentIndex]);
 
   // ── Touch handlers (vertical swipe = navigate, horizontal = card actions) ──
@@ -224,18 +256,28 @@ export default function NewsFeed({ selectedTopic }: Props) {
 
       {/* Counter + refresh */}
       <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
-        <span className="text-[10px] text-white/30 bg-black/50 px-2 py-1 rounded-full">
+        <span className="text-[10px] text-white/40 bg-black/60 px-2 py-1 rounded-full font-medium">
           {currentIndex + 1} / {items.length}
         </span>
         <button
           onClick={triggerRSSFetch}
           disabled={fetching}
-          className="flex items-center gap-1 px-2 py-1 bg-black/50 text-white/50 rounded-full text-xs border border-white/10 disabled:opacity-40"
+          className="flex items-center gap-1 px-2 py-1 bg-black/60 text-white/60 rounded-full text-xs border border-white/15 disabled:opacity-40"
         >
           <span className={fetching ? "animate-spin" : ""}>🔄</span>
           {fetching ? "..." : isNepali ? "ताजा" : "Refresh"}
         </button>
       </div>
+
+      {/* "Loading more" indicator when auto-fetching near end */}
+      {autoFetchedRef.current && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30">
+          <div className="flex items-center gap-2 bg-black/70 text-white/70 text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            {isNepali ? "थप समाचार लोड..." : "Loading more..."}
+          </div>
+        </div>
+      )}
 
       {/* Offline chip */}
       {!isOnline && (
