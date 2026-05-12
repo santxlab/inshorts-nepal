@@ -5,6 +5,7 @@ import { useGamification } from "@/contexts/GamificationContext";
 import { getRank, ALL_BADGES } from "@/lib/gamification";
 import { LANGUAGE_CONFIG } from "@/types";
 import { useState, useEffect } from "react";
+import { subscribeToNotifications } from "@/hooks/usePushNotifications";
 
 function ReferralSection({ userId, isNepali }: { userId: string; isNepali: boolean }) {
   const [code, setCode] = useState<string | null>(null);
@@ -92,7 +93,31 @@ export default function ProfilePage() {
   const langCfg = LANGUAGE_CONFIG[prefs.language];
 
   const earnedBadges = ALL_BADGES.filter((b) => gami.badges.includes(b.id));
-  const lockedBadges = ALL_BADGES.filter((b) => !gami.badges.includes(b.id));
+
+  // Notification permission state
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifSubscribed, setNotifSubscribed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotifPermission(Notification.permission);
+      setNotifSubscribed(Notification.permission === "granted");
+    }
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    setNotifLoading(true);
+    try {
+      const permission = await Notification.requestPermission();
+      setNotifPermission(permission);
+      if (permission === "granted") {
+        const ok = await subscribeToNotifications("anon", prefs.topics, prefs.language);
+        setNotifSubscribed(ok);
+      }
+    } catch { /* blocked */ }
+    setNotifLoading(false);
+  };
 
   return (
     <div className="flex-1 bg-black overflow-y-auto pb-20">
@@ -207,6 +232,49 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Push Notifications */}
+      {"Notification" in (typeof window !== "undefined" ? window : {}) && (
+        <div className="mx-4 mt-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔔</span>
+              <div>
+                <p className="text-white text-sm font-semibold">
+                  {isNepali ? "सूचनाहरू" : "Notifications"}
+                </p>
+                <p className="text-white/40 text-xs">
+                  {notifPermission === "granted"
+                    ? (isNepali ? "सक्षम छ" : "Enabled")
+                    : notifPermission === "denied"
+                    ? (isNepali ? "ब्राउजरले अस्वीकार गर्यो" : "Blocked by browser")
+                    : (isNepali ? "अक्षम छ" : "Disabled")}
+                </p>
+              </div>
+            </div>
+            {notifPermission === "denied" ? (
+              <span className="text-xs text-red-400 font-semibold">Blocked</span>
+            ) : notifSubscribed || notifPermission === "granted" ? (
+              <span className="text-xs text-green-400 font-semibold">✓ {isNepali ? "चालू" : "On"}</span>
+            ) : (
+              <button
+                onClick={handleEnableNotifications}
+                disabled={notifLoading}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold disabled:opacity-60 active:scale-95 transition-all"
+              >
+                {notifLoading ? "..." : (isNepali ? "सक्षम गर्नुहोस्" : "Enable")}
+              </button>
+            )}
+          </div>
+          {notifPermission === "denied" && (
+            <p className="text-white/30 text-xs mt-2">
+              {isNepali
+                ? "ब्राउजर सेटिङमा गएर सूचना अनुमति दिनुहोस्।"
+                : "Go to browser settings → Site settings → Allow notifications for this site."}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="mx-4 mt-4 space-y-2 pb-6">

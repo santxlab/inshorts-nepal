@@ -193,6 +193,7 @@ export default function AdminDashboard() {
       <div>
         <h2 className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-3">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <QuickLink href="/admin/push" emoji="🔔" label="Push Notifications" desc="Test & send notifications" />
           <QuickLink href="/admin/campaigns" emoji="📢" label="Manage Campaigns" desc="Sponsored content & ads" />
           <QuickLink href="/admin/analytics" emoji="📊" label="Full Analytics" desc="DAU, MAU, conversions" />
           <QuickLink href="/admin/referrals" emoji="👥" label="Referral Program" desc="Codes, rewards, fraud" />
