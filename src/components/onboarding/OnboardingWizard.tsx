@@ -1,22 +1,18 @@
 "use client";
 import { useState } from "react";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
-import { Language, LANGUAGE_CONFIG, RegionId, REGION_CONFIG } from "@/types";
+import { Language, LANGUAGE_CONFIG, RegionId, REGION_CONFIG, SUPPORTED_LANGUAGES } from "@/types";
 
 type Step = "language" | "region";
 
-const LANGUAGES: { id: Language; flag: string; name: string; nativeName: string; sub: string }[] = [
-  { id: "ne",  flag: "🇳🇵", name: "Nepali",      nativeName: "नेपाली",              sub: "नेपाली भाषामा समाचार" },
-  { id: "en",  flag: "🇬🇧", name: "English",     nativeName: "English",             sub: "News in English" },
-  { id: "hi",  flag: "🇮🇳", name: "Hindi",       nativeName: "हिन्दी",              sub: "हिन्दी में समाचार" },
-  { id: "mai", flag: "🇳🇵", name: "Maithali",    nativeName: "मैथिली",              sub: "मैथिली भाषाम समाचार" },
-  { id: "bho", flag: "🇳🇵", name: "Bhojpuri",    nativeName: "भोजपुरी",            sub: "भोजपुरी में खबर" },
-  { id: "thr", flag: "🇳🇵", name: "Tharu",       nativeName: "थारू",                sub: "थारू भाषामा समाचार" },
-  { id: "awa", flag: "🇳🇵", name: "Awadhi",      nativeName: "अवधी",               sub: "अवधी में समाचार" },
-  { id: "new", flag: "🇳🇵", name: "Nepal Bhasa", nativeName: "नेपाल भाषा",         sub: "नेवारी भाषाया न्हूगु" },
-  { id: "tam", flag: "🇳🇵", name: "Tamang",      nativeName: "तामाङ",               sub: "तामाङ भाषामा खबर" },
-  { id: "baj", flag: "🇳🇵", name: "Bajjika",     nativeName: "बज्जिका",            sub: "बज्जिका में खबर" },
-];
+// Only show languages with enough RSS sources (>3).
+// Currently: Nepali (31 sources) and English (15 sources).
+const LANGUAGES = SUPPORTED_LANGUAGES.map((id) => ({
+  id,
+  flag:       LANGUAGE_CONFIG[id].flag,
+  name:       LANGUAGE_CONFIG[id].label,
+  nativeName: LANGUAGE_CONFIG[id].nativeLabel,
+}));
 
 const REGIONS: { id: RegionId }[] = [
   { id: "nepal" },
@@ -97,24 +93,26 @@ export default function OnboardingWizard() {
         className={`flex-1 overflow-y-auto px-4 pb-6 transition-opacity duration-200 ${animating ? "opacity-0" : "opacity-100"}`}
       >
         {step === "language" && (
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="flex flex-col gap-4 pt-4 max-w-xs mx-auto w-full">
             {LANGUAGES.map((lang) => {
               const selected = prefs.language === lang.id;
               return (
                 <button
                   key={lang.id}
                   onClick={() => pickLanguage(lang.id)}
-                  className={`relative flex flex-col items-center text-center p-4 rounded-2xl border transition-all active:scale-95 ${
+                  className={`relative flex items-center gap-5 p-5 rounded-3xl border transition-all active:scale-95 text-left ${
                     selected
                       ? "bg-red-600/20 border-red-500 shadow-lg shadow-red-500/20"
                       : "bg-white/5 border-white/10 hover:border-white/25"
                   }`}
                 >
-                  <span className="text-4xl mb-2">{lang.flag}</span>
-                  <span className="text-white font-black text-base leading-tight">{lang.nativeName}</span>
-                  <span className="text-white/40 text-[11px] mt-0.5">{lang.name}</span>
+                  <span className="text-5xl">{lang.flag}</span>
+                  <div>
+                    <div className="text-white font-black text-xl leading-tight">{lang.nativeName}</div>
+                    <div className="text-white/45 text-sm mt-0.5">{lang.name}</div>
+                  </div>
                   {selected && (
-                    <span className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">✓</span>
+                    <span className="ml-auto w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">✓</span>
                   )}
                 </button>
               );

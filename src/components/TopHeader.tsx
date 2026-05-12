@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
-import { LANGUAGE_CONFIG, Language, TopicId } from "@/types";
+import { LANGUAGE_CONFIG, Language, TopicId, SUPPORTED_LANGUAGES } from "@/types";
 import { TOPICS } from "@/lib/topics-config";
 import StreakWidget from "./StreakWidget";
 
@@ -47,7 +47,7 @@ export default function TopHeader({ onTopicFilter, selectedTopic }: Props) {
       {/* Language picker dropdown */}
       {showLangPicker && (
         <div className="absolute top-full right-0 mt-1 mr-2 bg-gray-950 border border-white/15 rounded-2xl shadow-2xl z-50 overflow-hidden w-52">
-          {(Object.keys(LANGUAGE_CONFIG) as Language[]).map((lang) => {
+          {(SUPPORTED_LANGUAGES as Language[]).map((lang) => {
             const cfg = LANGUAGE_CONFIG[lang];
             return (
               <button

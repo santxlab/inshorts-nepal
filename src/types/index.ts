@@ -10,6 +10,10 @@ export type Language =
   | "awa"  // अवधी
   | "new"; // नेवारी
 
+// Languages that have enough RSS sources (>3) to be shown in the UI.
+// Others are kept in the type for future use but hidden from pickers.
+export const SUPPORTED_LANGUAGES: Language[] = ["ne", "en"];
+
 export const LANGUAGE_CONFIG: Record<Language, {
   label: string; nativeLabel: string; flag: string; rssLang: "ne" | "en";
 }> = {
