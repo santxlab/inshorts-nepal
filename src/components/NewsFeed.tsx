@@ -257,7 +257,7 @@ export default function NewsFeed({ selectedTopic }: Props) {
 
         // Compute per-card translateY
         const baseY = offset * 100; // %
-        const resistanceFactor = 0.35;
+        const resistanceFactor = 0.2;
         const extraY = isVerticalSwipe.current ? dragY * resistanceFactor : 0;
         const transformValue = `calc(${baseY}% + ${extraY}px)`;
 
@@ -267,7 +267,7 @@ export default function NewsFeed({ selectedTopic }: Props) {
             className="absolute inset-0"
             style={{
               transform: `translateY(${transformValue})`,
-              transition: dragY !== 0 ? "none" : "transform 350ms cubic-bezier(0.4, 0, 0.2, 1)",
+              transition: dragY !== 0 ? "none" : "transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
               willChange: "transform",
               pointerEvents: offset === 0 ? "auto" : "none",
             }}

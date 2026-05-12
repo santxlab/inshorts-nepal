@@ -4,12 +4,7 @@ import { NewsArticle } from "@/types";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
 import { useGamification } from "@/contexts/GamificationContext";
 import { getTopicById } from "@/lib/topics-config";
-import {
-  createSignal,
-  recordSignal,
-  loadBehaviorProfile,
-  saveBehaviorProfile,
-} from "@/lib/behavior";
+import { createSignal, recordSignal, loadBehaviorProfile, saveBehaviorProfile } from "@/lib/behavior";
 import { getFallbackImage } from "@/lib/image-fallbacks";
 import { recordBookmark, recordShare as recordEngShare } from "@/lib/engagement";
 
@@ -33,10 +28,8 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
   const { onArticleRead, onShare, onSave } = useGamification();
 
   const saved = isSaved(article.id);
-  const [expanded, setExpanded] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likeFlash, setLikeFlash] = useState(false);
-  const [saveFlash, setSaveFlash] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -54,11 +47,9 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
   const isNepali = prefs.language !== "en";
   const topicConfig = article.topics?.[0] ? getTopicById(article.topics[0]) : null;
-  // Use article image; if missing/broken, use curated category fallback
   const displayImage = imgError || !article.imageUrl
     ? getFallbackImage(article.id, article.topics ?? [], article.category)
     : article.imageUrl;
-  const hasImage = true; // always show an image with fallback system
 
   // Cleanup on unmount
   useEffect(() => {
@@ -69,12 +60,11 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
     };
   }, []);
 
-  // Keep refs in sync
   useEffect(() => { likedRef.current = liked; }, [liked]);
   useEffect(() => { savedRef.current = isSaved(article.id); }, [isSaved, article.id]);
   useEffect(() => { audioListenedRef.current = isPlaying; }, [isPlaying]);
 
-  // Track read time
+  // Track read time + behavior
   useEffect(() => {
     if (!isActive) return;
     startReadTime.current = Date.now();
@@ -96,7 +86,6 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
     };
   }, [isActive, article, onArticleRead]);
 
-  // Stop audio when card leaves view
   useEffect(() => {
     if (!isActive && isPlaying) {
       window.speechSynthesis?.cancel();
@@ -106,23 +95,21 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
   const handleSave = useCallback(() => {
     toggleSaved(article.id);
-    setSaveFlash(true);
-    setTimeout(() => setSaveFlash(false), 700);
     const newCount = saved ? prefs.savedArticleIds.length - 1 : prefs.savedArticleIds.length + 1;
     onSave(newCount);
-    if (!saved) recordBookmark(); // track for engagement prompts
+    if (!saved) recordBookmark();
   }, [article.id, toggleSaved, onSave, saved, prefs.savedArticleIds.length]);
 
   const handleLike = useCallback(() => {
     setLiked((v) => !v);
     setLikeFlash(true);
-    setTimeout(() => setLikeFlash(false), 700);
+    setTimeout(() => setLikeFlash(false), 600);
   }, []);
 
   const handleShare = useCallback(async () => {
     onShare();
     sharedRef.current = true;
-    recordEngShare(); // track for engagement prompts
+    recordEngShare();
     const text = `${article.title}\n\n${article.summary}\n\n${article.sourceUrl}`;
     try {
       if (navigator.share) await navigator.share({ title: article.title, text, url: article.sourceUrl });
@@ -159,10 +146,9 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
     const dx = t.clientX - touchStart.current.x;
     const dy = t.clientY - touchStart.current.y;
     const dt = Date.now() - touchStart.current.time;
-    const absDx = Math.abs(dx), absDy = Math.abs(dy);
     const now = Date.now();
 
-    if (absDx < 12 && absDy < 12 && dt < 300) {
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12 && dt < 300) {
       if (now - lastTap.current < 350) {
         if (singleTapTimer.current) { clearTimeout(singleTapTimer.current); singleTapTimer.current = null; }
         handleLike();
@@ -184,15 +170,13 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
   return (
     <div
-      className="relative w-full h-full flex flex-col overflow-hidden select-none"
-      style={{ background: "#0f0f0f" }}
+      className="relative w-full h-full flex flex-col overflow-hidden select-none bg-white"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {/* ── IMAGE SECTION (top ~52%) ────────────────────────── */}
+      {/* ── IMAGE (top ~52%) ──────────────────────────────────── */}
       <div className="relative flex-shrink-0" style={{ height: "52%" }}>
-        {/* Always show image — uses curated fallback if source image missing/broken */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={displayImage}
@@ -200,245 +184,216 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
           className="w-full h-full object-cover"
           onError={() => setImgError(true)}
         />
-        {/* Subtle bottom fade */}
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0f0f0f] to-transparent" />
 
-        {/* Breaking badge */}
-        {article.isBreaking && (
-          <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600 shadow-lg">
-            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            <span className="text-white text-[10px] font-black uppercase tracking-widest">Breaking</span>
+        {/* Top row: Breaking badge + progress dots */}
+        <div className="absolute top-0 left-0 right-0 flex items-start justify-between px-3 pt-3">
+          {article.isBreaking ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600 shadow-lg">
+              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span className="text-white text-[10px] font-black uppercase tracking-widest">Breaking</span>
+            </div>
+          ) : <div />}
+
+          {/* Progress dots */}
+          <div className="flex gap-1 items-center">
+            {Array.from({ length: Math.min(total, 6) }).map((_, i) => {
+              const mapped = Math.round((index / Math.max(total - 1, 1)) * 5);
+              return (
+                <div
+                  key={i}
+                  className={`rounded-full transition-all duration-300 ${
+                    i === mapped ? "w-5 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"
+                  }`}
+                />
+              );
+            })}
           </div>
-        )}
-
-        {/* Progress indicator */}
-        <div className="absolute top-3 right-3 flex gap-0.5 items-center">
-          {Array.from({ length: Math.min(total, 7) }).map((_, i) => {
-            const mapped = Math.round((index / Math.max(total - 1, 1)) * 6);
-            return (
-              <div
-                key={i}
-                className={`rounded-full transition-all ${i === mapped ? "w-4 h-1 bg-white" : "w-1 h-1 bg-white/40"}`}
-              />
-            );
-          })}
         </div>
 
-        {/* Audio bars */}
+        {/* Bottom of image: source name overlay */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-6">
+          <div className="flex items-center justify-between">
+            <span className="text-white text-xs font-bold opacity-90">{article.sourceName}</span>
+            <div className="flex items-center gap-3">
+              {/* Bookmark */}
+              <button
+                onClick={handleSave}
+                className="p-1.5 rounded-full bg-black/30 backdrop-blur-sm active:scale-90 transition-all"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill={saved ? "white" : "none"} stroke="white" strokeWidth="2.5">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+              </button>
+              {/* Share */}
+              <button
+                onClick={handleShare}
+                className="p-1.5 rounded-full bg-black/30 backdrop-blur-sm active:scale-90 transition-all"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Audio indicator */}
         {isPlaying && (
-          <div className="absolute bottom-4 right-3 flex gap-0.5 items-end bg-black/50 px-2 py-1.5 rounded-full backdrop-blur-sm">
-            {[3, 5, 4, 6, 3, 5, 4].map((h, i) => (
-              <div
-                key={i}
-                className="w-0.5 bg-white rounded-full"
-                style={{ height: `${h * 2}px`, animation: `audioWave 0.8s ease-in-out infinite`, animationDelay: `${i * 0.1}s` }}
-              />
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-0.5 items-end bg-black/60 px-3 py-1.5 rounded-full">
+            {[3, 5, 4, 6, 3].map((h, i) => (
+              <div key={i} className="w-0.5 bg-white rounded-full"
+                style={{ height: `${h * 2}px`, animation: `audioWave 0.8s ease-in-out infinite`, animationDelay: `${i * 0.12}s` }} />
             ))}
           </div>
         )}
       </div>
 
-      {/* ── CONTENT SECTION (bottom ~48%) ──────────────────── */}
-      <div className="flex-1 flex flex-col min-h-0 px-4 pt-3 pb-2">
-        {/* Source + meta row */}
-        <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-          <span className="text-white/50 text-[11px] font-semibold">{article.sourceName}</span>
-          <span className="text-white/25 text-[11px]">•</span>
-          <span className="text-white/40 text-[11px]">{timeAgo(article.publishedAt, isNepali)}</span>
-          {topicConfig && (
+      {/* ── CONTENT PANEL (white, like Inshorts) ──────────────── */}
+      <div className="flex-1 flex flex-col min-h-0 bg-white">
+
+        {/* Topic tag */}
+        {topicConfig && (
+          <div className="px-4 pt-3 pb-1">
             <span
-              className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-              style={{ backgroundColor: topicConfig.color + "cc" }}
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-white"
+              style={{ backgroundColor: topicConfig.color }}
             >
               {topicConfig.emoji} {isNepali ? topicConfig.labelNe : topicConfig.label}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Title */}
-        <h2 className="text-white text-[17px] font-black leading-snug mb-2 line-clamp-3">
-          {article.title}
-        </h2>
-
-        {/* Summary (scrollable/expandable) */}
-        <div className="flex-1 min-h-0 overflow-y-auto mb-2 news-card-detail">
-          <p
-            className={`text-white/65 text-[13px] leading-relaxed ${expanded ? "" : "line-clamp-3"}`}
-            onClick={() => setExpanded((v) => !v)}
-          >
-            {article.summary}
-          </p>
-          {!expanded && article.summary.length > 120 && (
-            <button
-              onClick={() => setExpanded(true)}
-              className="text-white/35 text-[11px] mt-1 flex items-center gap-1"
-            >
-              {isNepali ? "थप पढ्नुहोस्" : "more"} ▾
-            </button>
-          )}
+        <div className="px-4 pt-2">
+          <h2 className="text-[#1a1a1a] text-[17px] font-black leading-snug">
+            {article.title}
+          </h2>
         </div>
 
-        {/* ── ACTION BAR ──────────────────────────────────── */}
-        <div className="flex items-center gap-2 pt-2 border-t border-white/8 flex-shrink-0">
-          {/* Like */}
-          <button
-            onClick={handleLike}
-            className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 transition-all active:scale-95 ${
-              liked ? "bg-red-500/20" : "bg-white/6"
-            }`}
-          >
-            <span className="text-lg leading-none">{liked ? "❤️" : "🤍"}</span>
-            <span className={`text-[9px] font-medium ${liked ? "text-red-400" : "text-white/40"}`}>
-              {isNepali ? "लाइक" : "Like"}
-            </span>
-          </button>
+        {/* Summary — scrollable */}
+        <div className="flex-1 px-4 pt-2 min-h-0 overflow-y-auto">
+          <p className="text-[#444] text-[14px] leading-relaxed">
+            {article.summary}
+          </p>
+        </div>
 
-          {/* Save */}
-          <button
-            onClick={handleSave}
-            className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 transition-all active:scale-95 ${
-              saved ? "bg-amber-500/20" : "bg-white/6"
-            }`}
-          >
-            <span className="text-lg leading-none">{saved ? "🔖" : "📋"}</span>
-            <span className={`text-[9px] font-medium ${saved ? "text-amber-400" : "text-white/40"}`}>
-              {isNepali ? "सेव" : "Save"}
-            </span>
-          </button>
-
-          {/* Audio */}
+        {/* Meta row: time + audio button */}
+        <div className="px-4 py-2 flex items-center justify-between">
+          <span className="text-[#999] text-[12px]">
+            {timeAgo(article.publishedAt, isNepali)}
+          </span>
           <button
             onClick={handleAudio}
-            className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 transition-all active:scale-95 ${
-              isPlaying ? "bg-purple-500/20" : "bg-white/6"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all active:scale-95 ${
+              isPlaying ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600"
             }`}
           >
-            <span className="text-lg leading-none">{isPlaying ? "⏹️" : "🎧"}</span>
-            <span className={`text-[9px] font-medium ${isPlaying ? "text-purple-400" : "text-white/40"}`}>
-              {isNepali ? (isPlaying ? "रोक्नु" : "सुन्नु") : (isPlaying ? "Stop" : "Listen")}
-            </span>
+            <span>{isPlaying ? "⏹" : "🎧"}</span>
+            <span>{isNepali ? (isPlaying ? "रोक्नु" : "सुन्नु") : (isPlaying ? "Stop" : "Listen")}</span>
           </button>
+        </div>
 
-          {/* WhatsApp */}
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(article.title + "\n\n" + article.summary.slice(0, 120) + "...\n\n" + article.sourceUrl)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 bg-green-600/20 active:scale-95 transition-all"
-          >
-            <span className="text-lg leading-none">📱</span>
-            <span className="text-[9px] font-medium text-green-400">WA</span>
-          </a>
-
-          {/* Share */}
-          <button
-            onClick={handleShare}
-            className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 bg-white/6 active:scale-95 transition-all"
-          >
-            <span className="text-lg leading-none">📤</span>
-            <span className="text-[9px] font-medium text-white/40">
-              {isNepali ? "शेयर" : "Share"}
-            </span>
-          </button>
-
-          {/* Read full */}
-          <button
-            onClick={() => setShowDetail(true)}
-            className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 bg-white/10 active:scale-95 transition-all"
-          >
-            <span className="text-lg leading-none">📖</span>
-            <span className="text-[9px] font-medium text-white/60">
-              {isNepali ? "पढ्नु" : "Read"}
-            </span>
-          </button>
+        {/* Bottom strip — "Read more" like Inshorts */}
+        <div className="border-t border-gray-100">
+          <div className="flex items-center">
+            <button
+              onClick={() => setShowDetail(true)}
+              className="flex-1 py-3 flex items-center justify-center gap-2 text-[13px] font-semibold text-[#e63946] active:bg-red-50 transition-all"
+            >
+              {isNepali ? "पूरा पढ्नुहोस् →" : "Read more →"}
+            </button>
+            <div className="w-px h-8 bg-gray-100" />
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(article.title + "\n\n" + article.sourceUrl)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-5 py-3 flex items-center gap-1.5 text-[13px] font-semibold text-green-600 active:bg-green-50 transition-all"
+            >
+              <span>📱</span>
+              <span>WA</span>
+            </a>
+            <div className="w-px h-8 bg-gray-100" />
+            <button
+              onClick={handleLike}
+              className="px-5 py-3 flex items-center gap-1.5 text-[13px] font-semibold active:bg-gray-50 transition-all"
+            >
+              <span>{liked ? "❤️" : "🤍"}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ── FLASH EFFECTS ──────────────────────────────────── */}
+      {/* ── LIKE FLASH ────────────────────────────────────────── */}
       {likeFlash && (
         <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-          <div className="text-[100px] drop-shadow-2xl" style={{ animation: "likeFlash 0.6s ease" }}>❤️</div>
-        </div>
-      )}
-      {saveFlash && !likeFlash && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none">
-          <div className="bg-black/80 text-white px-5 py-2.5 rounded-2xl font-bold text-sm backdrop-blur-sm">
-            {saved ? "🔖 Saved!" : "Removed"}
-          </div>
+          <div className="text-[90px] drop-shadow-2xl" style={{ animation: "likeFlash 0.6s ease" }}>❤️</div>
         </div>
       )}
 
-      {/* ── DETAIL PANEL ───────────────────────────────────── */}
+      {/* ── DETAIL PANEL ──────────────────────────────────────── */}
       {showDetail && (
-        <div
-          className="absolute inset-0 z-40 bg-[#0a0a0a] flex flex-col"
-          onClick={() => setShowDetail(false)}
-        >
-          <div className="news-card-detail flex-1 p-5 pt-12 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute inset-0 z-40 bg-white flex flex-col">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 flex-shrink-0">
             <button
               onClick={() => setShowDetail(false)}
-              className="absolute top-4 left-4 flex items-center gap-2 text-white/40 text-sm"
+              className="flex items-center gap-1 text-[#e63946] text-sm font-semibold"
             >
               ← {isNepali ? "फर्कनुहोस्" : "Back"}
             </button>
+            <span className="flex-1 text-[#999] text-xs text-center truncate">{article.sourceName}</span>
+            <button onClick={handleSave}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill={saved ? "#e63946" : "none"} stroke={saved ? "#e63946" : "#999"} strokeWidth="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+          </div>
 
-            {/* Image in detail */}
-            <div className="rounded-2xl overflow-hidden mb-4" style={{ height: 200 }}>
+          <div className="flex-1 overflow-y-auto">
+            {/* Image */}
+            <div className="w-full" style={{ height: 220 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={displayImage} alt={article.title} className="w-full h-full object-cover" />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              {topicConfig && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold text-white" style={{ backgroundColor: topicConfig.color }}>
-                  {topicConfig.emoji} {isNepali ? topicConfig.labelNe : topicConfig.label}
-                </span>
+            <div className="px-4 pt-4 pb-6">
+              {/* Topic + time */}
+              <div className="flex items-center gap-2 mb-3">
+                {topicConfig && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: topicConfig.color }}>
+                    {topicConfig.emoji} {isNepali ? topicConfig.labelNe : topicConfig.label}
+                  </span>
+                )}
+                <span className="text-[#999] text-[12px]">{timeAgo(article.publishedAt, isNepali)}</span>
+              </div>
+
+              {/* Title */}
+              <h2 className="text-[#1a1a1a] text-xl font-black leading-snug mb-3">{article.title}</h2>
+
+              {/* Summary */}
+              <p className="text-[#444] text-[15px] leading-relaxed mb-4">{article.summary}</p>
+
+              {article.fullContent && (
+                <p className="text-[#666] text-[14px] leading-relaxed mb-4">{article.fullContent}</p>
               )}
-              <span className="text-white/40 text-xs">{article.sourceName}</span>
-              <span className="text-white/25 text-xs">•</span>
-              <span className="text-white/40 text-xs">{timeAgo(article.publishedAt, isNepali)}</span>
-            </div>
 
-            <h2 className="text-white text-xl font-black leading-snug mb-4">{article.title}</h2>
-            <p className="text-white/75 text-[15px] leading-relaxed mb-4">{article.summary}</p>
-            {article.fullContent && (
-              <p className="text-white/55 text-sm leading-relaxed mb-4">{article.fullContent}</p>
-            )}
-
-            <div className="border-t border-white/10 pt-5 space-y-3">
-              <div className="flex gap-3">
+              {/* Actions */}
+              <div className="flex gap-3 mt-4">
                 <button
-                  onClick={handleSave}
-                  className={`flex-1 py-3 rounded-xl text-sm font-bold border transition-all ${
-                    saved ? "bg-amber-500/20 text-amber-300 border-amber-500/40" : "bg-white/8 text-white border-white/15"
-                  }`}
+                  onClick={handleShare}
+                  className="flex-1 py-3 rounded-xl text-sm font-bold bg-gray-100 text-gray-700 active:scale-95 transition-all"
                 >
-                  {saved ? "🔖 Saved" : "📋 Save"}
+                  📤 {isNepali ? "शेयर" : "Share"}
                 </button>
                 <a
                   href={article.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-3 rounded-xl text-sm font-bold bg-white text-black text-center"
+                  className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#e63946] text-white text-center active:scale-95 transition-all"
                 >
                   {isNepali ? "पूरा पढ्नुहोस् →" : "Read Full →"}
                 </a>
-              </div>
-              <div className="flex gap-3">
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(article.title + "\n\n" + article.sourceUrl)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 py-3 rounded-xl text-sm font-bold bg-green-600 text-white text-center"
-                >
-                  📱 WhatsApp
-                </a>
-                <button
-                  onClick={handleShare}
-                  className="flex-1 py-3 rounded-xl text-sm font-semibold bg-white/8 text-white border border-white/15"
-                >
-                  📤 {isNepali ? "सेयर" : "Share"}
-                </button>
               </div>
             </div>
           </div>
