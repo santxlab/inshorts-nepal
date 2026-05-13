@@ -123,6 +123,33 @@ export default function NewsFeed({ selectedTopic }: Props) {
     setTimeout(() => { isNavigating.current = false; }, 300);
   }, [currentIndex]);
 
+  // ── Keyboard + mouse wheel navigation (desktop) ───────────────
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        navigateTo(currentIndex + 1, items.length);
+      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        navigateTo(currentIndex - 1, items.length);
+      }
+    };
+    let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (wheelTimeout) return;
+      wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 400);
+      if (e.deltaY > 30) navigateTo(currentIndex + 1, items.length);
+      else if (e.deltaY < -30) navigateTo(currentIndex - 1, items.length);
+    };
+    window.addEventListener("keydown", handleKey);
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("wheel", handleWheel);
+    };
+  }, [currentIndex, items.length, navigateTo]);
+
   // ── Touch handlers (vertical swipe = navigate, horizontal = card actions) ──
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
