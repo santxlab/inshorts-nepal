@@ -123,9 +123,8 @@ export default function NewsFeed({ selectedTopic }: Props) {
     setTimeout(() => { isNavigating.current = false; }, 300);
   }, [currentIndex]);
 
-  // ── Keyboard + mouse wheel navigation (desktop) ───────────────
+  // ── Keyboard navigation (desktop) ───────────────
   useEffect(() => {
-    // total = articles + 1 poll every 8 articles
     const total = articles.length + Math.floor(articles.length / 8);
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown" || e.key === "ArrowRight") {
@@ -136,20 +135,19 @@ export default function NewsFeed({ selectedTopic }: Props) {
         navigateTo(currentIndex - 1, total);
       }
     };
-    let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (wheelTimeout) return;
-      wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 400);
-      if (e.deltaY > 30) navigateTo(currentIndex + 1, total);
-      else if (e.deltaY < -30) navigateTo(currentIndex - 1, total);
-    };
     window.addEventListener("keydown", handleKey);
-    window.addEventListener("wheel", handleWheel, { passive: false });
-    return () => {
-      window.removeEventListener("keydown", handleKey);
-      window.removeEventListener("wheel", handleWheel);
-    };
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [currentIndex, articles.length, navigateTo]);
+
+  // ── Mouse wheel handler ───────────────────────────────────────
+  const wheelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    if (wheelTimeoutRef.current) return;
+    const total = articles.length + Math.floor(articles.length / 8);
+    wheelTimeoutRef.current = setTimeout(() => { wheelTimeoutRef.current = null; }, 400);
+    if (e.deltaY > 30) navigateTo(currentIndex + 1, total);
+    else if (e.deltaY < -30) navigateTo(currentIndex - 1, total);
   }, [currentIndex, articles.length, navigateTo]);
 
   // ── Touch handlers (vertical swipe = navigate, horizontal = card actions) ──
@@ -279,6 +277,7 @@ export default function NewsFeed({ selectedTopic }: Props) {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={(e) => handleTouchEnd(e, items.length)}
+      onWheel={handleWheel}
     >
       {/* Digest banner (above cards) */}
       <DigestBanner articleCount={articles.length} />

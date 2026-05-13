@@ -32,7 +32,13 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
   const [likeFlash, setLikeFlash] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const [showWebView, setShowWebView] = useState(false);
   const [imgError, setImgError] = useState(false);
+
+  // Canonical share URL — always links to our app
+  const appUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/news/${article.id}`
+    : `https://inshortsnepal.org/news/${article.id}`;
 
   const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
   const lastTap = useRef<number>(0);
@@ -114,10 +120,10 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
     onShare();
     sharedRef.current = true;
     recordEngShare();
-    const text = `${article.title}\n\n${article.summary}\n\n${article.sourceUrl}`;
+    const text = `${article.title}\n\nRead on InShorts Nepal: ${appUrl}`;
     try {
-      if (navigator.share) await navigator.share({ title: article.title, text, url: article.sourceUrl });
-      else await navigator.clipboard.writeText(text);
+      if (navigator.share) await navigator.share({ title: article.title, text, url: appUrl });
+      else await navigator.clipboard.writeText(appUrl);
     } catch { /* cancelled */ }
   }, [article, onShare]);
 
@@ -309,7 +315,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
             </button>
             <div className="w-px h-8 bg-gray-100" />
             <a
-              href={`https://wa.me/?text=${encodeURIComponent(article.title + "\n\n" + article.sourceUrl)}`}
+              href={`https://wa.me/?text=${encodeURIComponent(article.title + "\n\nRead on InShorts Nepal: " + appUrl)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="px-5 py-3 flex items-center gap-1.5 text-[13px] font-semibold text-green-600 active:bg-green-50 transition-all"
@@ -390,17 +396,49 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
                 >
                   📤 {isNepali ? "शेयर" : "Share"}
                 </button>
-                <a
-                  href={article.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => setShowWebView(true)}
                   className="flex-1 py-3 rounded-xl text-sm font-bold bg-[#e63946] text-white text-center active:scale-95 transition-all"
                 >
                   {isNepali ? "पूरा पढ्नुहोस् →" : "Read Full →"}
-                </a>
+                </button>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── In-app WebView ── */}
+      {showWebView && (
+        <div className="fixed inset-0 z-[200] flex flex-col bg-black">
+          {/* Top bar */}
+          <div className="flex items-center gap-3 px-4 py-3 bg-[#1a1a1a] border-b border-white/10 flex-shrink-0">
+            <button
+              onClick={() => setShowWebView(false)}
+              className="text-white/80 hover:text-white text-2xl leading-none"
+            >
+              ✕
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-xs font-semibold truncate">{article.title}</p>
+              <p className="text-white/40 text-[10px] truncate">{article.sourceUrl}</p>
+            </div>
+            <a
+              href={article.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/60 text-xs px-2 py-1 rounded-lg bg-white/10"
+            >
+              ↗
+            </a>
+          </div>
+          {/* iframe */}
+          <iframe
+            src={article.sourceUrl}
+            className="flex-1 w-full border-none"
+            title={article.title}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+          />
         </div>
       )}
     </div>
