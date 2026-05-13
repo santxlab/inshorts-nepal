@@ -125,13 +125,15 @@ export default function NewsFeed({ selectedTopic }: Props) {
 
   // ── Keyboard + mouse wheel navigation (desktop) ───────────────
   useEffect(() => {
+    // total = articles + 1 poll every 8 articles
+    const total = articles.length + Math.floor(articles.length / 8);
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown" || e.key === "ArrowRight") {
         e.preventDefault();
-        navigateTo(currentIndex + 1, items.length);
+        navigateTo(currentIndex + 1, total);
       } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
         e.preventDefault();
-        navigateTo(currentIndex - 1, items.length);
+        navigateTo(currentIndex - 1, total);
       }
     };
     let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -139,8 +141,8 @@ export default function NewsFeed({ selectedTopic }: Props) {
       e.preventDefault();
       if (wheelTimeout) return;
       wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 400);
-      if (e.deltaY > 30) navigateTo(currentIndex + 1, items.length);
-      else if (e.deltaY < -30) navigateTo(currentIndex - 1, items.length);
+      if (e.deltaY > 30) navigateTo(currentIndex + 1, total);
+      else if (e.deltaY < -30) navigateTo(currentIndex - 1, total);
     };
     window.addEventListener("keydown", handleKey);
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -148,7 +150,7 @@ export default function NewsFeed({ selectedTopic }: Props) {
       window.removeEventListener("keydown", handleKey);
       window.removeEventListener("wheel", handleWheel);
     };
-  }, [currentIndex, items.length, navigateTo]);
+  }, [currentIndex, articles.length, navigateTo]);
 
   // ── Touch handlers (vertical swipe = navigate, horizontal = card actions) ──
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
