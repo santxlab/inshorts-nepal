@@ -186,8 +186,8 @@ export default function NewsFeed({ selectedTopic }: Props) {
 
     if (!isVerticalSwipe.current) return;
 
-    // Fast flick needs less distance
-    const threshold = velocity > 0.4 ? 25 : 55;
+    // Fast flick needs less distance; matched to Inshorts feel
+    const threshold = velocity > 0.3 ? 20 : 50;
 
     if (dy < -threshold) {
       navigateTo(currentIndex + 1, totalItems);
@@ -325,10 +325,13 @@ export default function NewsFeed({ selectedTopic }: Props) {
         // Only render current card ± 2 for performance
         if (Math.abs(offset) > 2) return null;
 
-        // Compute per-card translateY
+        // Compute per-card translateY — 1:1 drag for current card, adjacent cards follow
         const baseY = offset * 100; // %
-        const resistanceFactor = 0.2;
-        const extraY = isVerticalSwipe.current ? dragY * resistanceFactor : 0;
+        // Current card moves 1:1 with finger. Adjacent cards also move by same amount so they peek in.
+        // Apply rubber-band resistance only at the edges (first card going up, last card going down).
+        const isAtEdge = (currentIndex === 0 && dragY > 0) || (currentIndex === items.length - 1 && dragY < 0);
+        const rawDrag = isVerticalSwipe.current ? dragY : 0;
+        const extraY = isAtEdge ? rawDrag * 0.2 : rawDrag; // rubber-band at edges only
         const transformValue = `calc(${baseY}% + ${extraY}px)`;
 
         return (
@@ -337,7 +340,7 @@ export default function NewsFeed({ selectedTopic }: Props) {
             className="absolute inset-0"
             style={{
               transform: `translateY(${transformValue})`,
-              transition: dragY !== 0 ? "none" : "transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+              transition: dragY !== 0 ? "none" : "transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
               willChange: "transform",
               pointerEvents: offset === 0 ? "auto" : "none",
             }}
