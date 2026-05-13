@@ -47,9 +47,13 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
 
   const isNepali = prefs.language !== "en";
   const topicConfig = article.topics?.[0] ? getTopicById(article.topics[0]) : null;
-  const displayImage = imgError || !article.imageUrl
+  const rawImage = imgError || !article.imageUrl
     ? getFallbackImage(article.id, article.topics ?? [], article.category)
     : article.imageUrl;
+  // Proxy external images to fix HTTPS mixed-content + hotlink issues
+  const displayImage = rawImage.startsWith("http")
+    ? `/api/image-proxy?url=${encodeURIComponent(rawImage)}`
+    : rawImage;
 
   // Cleanup on unmount
   useEffect(() => {
