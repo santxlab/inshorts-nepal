@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { pushManager } from "@/lib/push-manager";
-import { getArticles } from "@/lib/rss-fetcher";
+import { store } from "@/lib/store";
 
 const CRON_SECRET = process.env.CRON_SECRET ?? "inshorts-cron-2026";
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     if (type === "morning") {
       // Morning digest — top 3 recent articles
-      const articles = getArticles(lang).slice(0, 3);
+      const articles = store.getArticles(lang).slice(0, 3);
       const headline = articles[0];
       const title = lang === "ne"
         ? "☀️ सुप्रभात! आजका मुख्य समाचार"
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === "evening") {
-      const articles = getArticles(lang).slice(0, 1);
+      const articles = store.getArticles(lang).slice(0, 1);
       const headline = articles[0];
       const title = lang === "ne"
         ? "🌙 साँझको समाचार संक्षेप"
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (type === "breaking") {
       // Find breaking articles published in last 30 minutes
       const now = Date.now();
-      const breakingArticles = getArticles(lang).filter(a =>
+      const breakingArticles = store.getArticles(lang).filter(a =>
         a.isBreaking && (now - new Date(a.publishedAt).getTime()) < 30 * 60 * 1000
       );
 
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     if (type === "daily") {
       // Daily fresh news digest — top article from last 24h
-      const articles = getArticles(lang)
+      const articles = store.getArticles(lang)
         .filter(a => Date.now() - new Date(a.publishedAt).getTime() < 24 * 60 * 60 * 1000)
         .slice(0, 1);
       const article = articles[0];
