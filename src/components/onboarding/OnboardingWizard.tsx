@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
-import { Language, LANGUAGE_CONFIG, RegionId, REGION_CONFIG, SUPPORTED_LANGUAGES } from "@/types";
+import { Language, LANGUAGE_CONFIG, RegionId, REGION_CONFIG, SUPPORTED_LANGUAGES, TopicId } from "@/types";
 import NotificationsStep from "./steps/NotificationsStep";
+import TopicsStep from "./steps/TopicsStep";
+import { loadBehaviorProfile, saveBehaviorProfile } from "@/lib/behavior";
 
-type Step = "language" | "region" | "notifications";
+type Step = "language" | "region" | "topics" | "notifications";
 
 // Only show languages with enough RSS sources (>3).
 // Currently: Nepali (26 sources) and English (12 sources).
@@ -28,7 +30,7 @@ const REGIONS: { id: RegionId }[] = [
 ];
 
 export default function OnboardingWizard() {
-  const { prefs, setLanguage, setRegion, completeOnboarding } = useUserPrefs();
+  const { prefs, setLanguage, setRegion, setTopics, completeOnboarding } = useUserPrefs();
   const [step, setStep] = useState<Step>("language");
   const [animating, setAnimating] = useState(false);
 
@@ -38,6 +40,11 @@ export default function OnboardingWizard() {
     setTimeout(() => { setStep("region"); setAnimating(false); }, 250);
   };
 
+  const goToTopics = () => {
+    setAnimating(true);
+    setTimeout(() => { setStep("topics"); setAnimating(false); }, 250);
+  };
+
   const goToNotifications = () => {
     setAnimating(true);
     setTimeout(() => { setStep("notifications"); setAnimating(false); }, 250);
@@ -45,10 +52,24 @@ export default function OnboardingWizard() {
 
   const pickRegion = (region: RegionId) => {
     setRegion(region);
-    goToNotifications();
+    goToTopics();
   };
 
   const skipRegion = () => {
+    goToTopics();
+  };
+
+  // Seed the behavior profile so the feed is personalized from card #1.
+  // We bump topicScores for the picked topics — `personalizeOrder()` then
+  // sorts the feed by those scores until enough real swipe signals replace them.
+  const handleTopicsContinue = (picked: TopicId[]) => {
+    setTopics(picked);
+    if (picked.length > 0) {
+      const profile = loadBehaviorProfile();
+      const scores = { ...profile.topicScores } as Record<string, number>;
+      for (const t of picked) scores[t] = 80;
+      saveBehaviorProfile({ ...profile, topicScores: scores as typeof profile.topicScores });
+    }
     goToNotifications();
   };
 
@@ -57,6 +78,8 @@ export default function OnboardingWizard() {
   };
 
   const isNepali = prefs.language !== "en";
+  const STEP_ORDER: Step[] = ["language", "region", "topics", "notifications"];
+  const stepIndex = STEP_ORDER.indexOf(step);
 
   // Notifications step has its own full-screen layout; render it alone.
   if (step === "notifications") {
@@ -68,14 +91,49 @@ export default function OnboardingWizard() {
         <NotificationsStep
           onEnable={finishOnboarding}
           onSkip={finishOnboarding}
-          onBack={() => setStep("region")}
+          onBack={() => setStep("topics")}
         />
       </div>
     );
   }
 
-  const STEP_ORDER: Step[] = ["language", "region", "notifications"];
-  const stepIndex = STEP_ORDER.indexOf(step);
+  // Topics step also has its own back/continue buttons; render with a thin
+  // shared brand header above it so the user keeps context.
+  if (step === "topics") {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+        style={{ background: "linear-gradient(160deg, #0a0a0a 0%, #1a0a0a 40%, #0a0a1a 100%)" }}
+      >
+        <div className="flex-shrink-0 px-6 pt-12 pb-3 text-center">
+          <h2 className="text-white text-2xl font-black mb-1">
+            {isNepali ? "तपाईंलाई के मन पर्छ?" : "What interests you?"}
+          </h2>
+          <p className="text-white/45 text-sm">
+            {isNepali ? "कम्तीमा ३ छान्नुहोस् — फिड व्यक्तिगत हुनेछ" : "Pick at least 3 — your feed gets personalized"}
+          </p>
+          <div className="flex justify-center gap-2 mt-3">
+            {STEP_ORDER.map((s, i) => (
+              <div
+                key={s}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === STEP_ORDER.indexOf("topics") ? "w-8 bg-red-500"
+                    : i < STEP_ORDER.indexOf("topics") ? "w-2 bg-white/40"
+                    : "w-2 bg-white/20"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+        <TopicsStep
+          selected={prefs.topics}
+          onTopics={setTopics}
+          onNext={() => handleTopicsContinue(prefs.topics)}
+          onBack={() => setStep("region")}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -104,7 +162,7 @@ export default function OnboardingWizard() {
           </>
         )}
 
-        {/* Step dots — 3 segments, active = wide red, past = small white, future = faded */}
+        {/* Step dots — one per step, active = wide red, past = small white, future = faded */}
         <div className="flex justify-center gap-2 mt-4">
           {STEP_ORDER.map((s, i) => (
             <div

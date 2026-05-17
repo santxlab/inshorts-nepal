@@ -10,6 +10,7 @@ import OnboardingWizard from "@/components/onboarding/OnboardingWizard";
 import EngagementPrompt from "@/components/EngagementPrompt";
 import SavedPage from "@/components/pages/SavedPage";
 import ProfilePage from "@/components/pages/ProfilePage";
+import DiscoverPage from "@/components/pages/DiscoverPage";
 import { usePushBehaviorSync } from "@/hooks/usePushNotifications";
 import { recordSession } from "@/lib/engagement";
 
@@ -22,6 +23,18 @@ export default function Home() {
 
   // Keep push notification server updated with behavioral topic scores
   usePushBehaviorSync();
+
+  // Discover page dispatches this event when a topic chip is tapped — jump to
+  // Home with that topic preselected.
+  useEffect(() => {
+    function onOpenTopic(e: Event) {
+      const id = (e as CustomEvent<TopicId>).detail;
+      setSelectedTopic(id);
+      setActiveTab("home");
+    }
+    window.addEventListener("inshorts:openTopic", onOpenTopic);
+    return () => window.removeEventListener("inshorts:openTopic", onOpenTopic);
+  }, []);
 
   // Track session + device install on every app open
   useEffect(() => {
@@ -86,9 +99,7 @@ export default function Home() {
         {activeTab === "home" && (
           <NewsFeed selectedTopic={selectedTopic} />
         )}
-        {activeTab === "discover" && (
-          <NewsFeed selectedTopic={null} />
-        )}
+        {activeTab === "discover" && <DiscoverPage />}
         {activeTab === "saved" && <SavedPage />}
         {activeTab === "profile" && <ProfilePage />}
       </div>
