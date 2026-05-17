@@ -212,14 +212,6 @@ function getDefaultSources(): NewsSource[] {
       category: "all",
       isActive: true,
     },
-    {
-      id: "en-southasiatime",
-      name: "South Asia Time",
-      url: "https://southasiatime.com/feed/",
-      language: "en",
-      category: "all",
-      isActive: true,
-    },
     // Nepali Sources
     {
       id: "ne-ratopati",
