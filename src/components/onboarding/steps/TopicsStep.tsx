@@ -1,6 +1,7 @@
 "use client";
 import { TopicId } from "@/types";
 import { TOPICS } from "@/lib/topics-config";
+import { useUserPrefs } from "@/contexts/UserPrefsContext";
 
 interface Props {
   selected: TopicId[];
@@ -10,6 +11,9 @@ interface Props {
 }
 
 export default function TopicsStep({ selected, onTopics, onNext, onBack }: Props) {
+  const { prefs } = useUserPrefs();
+  const isNepali = prefs.language !== "en";
+
   const toggle = (id: TopicId) => {
     onTopics(
       selected.includes(id) ? selected.filter((t) => t !== id) : [...selected, id]
@@ -21,18 +25,17 @@ export default function TopicsStep({ selected, onTopics, onNext, onBack }: Props
 
   return (
     <div className="flex flex-col h-full px-6">
-      <div className="text-center mb-4">
-        <div className="text-5xl mb-3">🎯</div>
-        <h2 className="text-2xl font-bold text-white mb-1">Your Interests</h2>
-        <p className="text-white/70 text-sm">Pick topics you care about</p>
-        <div className="flex items-center justify-center gap-2 mt-2">
-          <span className="px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold">
-            {selected.length} selected
-          </span>
-          <button onClick={toggleAll} className="text-white/60 text-xs underline">
-            {allSelected ? "Deselect all" : "Select all"}
-          </button>
-        </div>
+      {/* Compact selection counter — the wizard renders the heading above */}
+      <div className="flex items-center justify-center gap-2 pt-1 pb-3">
+        <span className="px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold">
+          {selected.length} {isNepali ? "छानिएको" : "selected"}
+        </span>
+        <button onClick={toggleAll} className="text-white/60 text-xs underline">
+          {allSelected
+            ? (isNepali ? "सबै हटाउनुहोस्" : "Deselect all")
+            : (isNepali ? "सबै छान्नुहोस्" : "Select all")
+          }
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-2">
@@ -70,14 +73,14 @@ export default function TopicsStep({ selected, onTopics, onNext, onBack }: Props
           onClick={onBack}
           className="px-6 py-4 rounded-2xl border-2 border-white/40 text-white font-semibold"
         >
-          ← Back
+          {isNepali ? "← पछाडि" : "← Back"}
         </button>
         <button
           onClick={onNext}
           disabled={selected.length === 0}
           className="flex-1 py-4 rounded-2xl bg-white text-[#DC143C] font-bold text-lg shadow-lg disabled:opacity-50"
         >
-          Continue →
+          {isNepali ? "जारी राख्नुहोस् →" : "Continue →"}
         </button>
       </div>
     </div>
