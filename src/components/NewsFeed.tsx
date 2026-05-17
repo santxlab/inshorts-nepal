@@ -196,6 +196,17 @@ export default function NewsFeed({ selectedTopic }: Props) {
     }
   }, [currentIndex, navigateTo]);
 
+  // Build item list: article + poll every 8 — memoized so counter is always in sync.
+  // MUST be declared before any early return to satisfy Rules of Hooks.
+  const items = useMemo(() => {
+    const list: Array<{ type: "article"; data: NewsArticle; key: string } | { type: "poll"; key: string }> = [];
+    articles.forEach((a, i) => {
+      list.push({ type: "article", data: a, key: a.id });
+      if ((i + 1) % 8 === 0) list.push({ type: "poll", key: `poll-${i}` });
+    });
+    return list;
+  }, [articles]);
+
   // ── Loading skeleton ───────────────────────────────────────
   if (loading) {
     return (
@@ -259,16 +270,6 @@ export default function NewsFeed({ selectedTopic }: Props) {
       </div>
     );
   }
-
-  // Build item list: article + poll every 8 — memoized so counter is always in sync
-  const items = useMemo(() => {
-    const list: Array<{ type: "article"; data: NewsArticle; key: string } | { type: "poll"; key: string }> = [];
-    articles.forEach((a, i) => {
-      list.push({ type: "article", data: a, key: a.id });
-      if ((i + 1) % 8 === 0) list.push({ type: "poll", key: `poll-${i}` });
-    });
-    return list;
-  }, [articles]);
 
   return (
     <div

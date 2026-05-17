@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
 import { Language, LANGUAGE_CONFIG, RegionId, REGION_CONFIG, SUPPORTED_LANGUAGES } from "@/types";
+import NotificationsStep from "./steps/NotificationsStep";
 
-type Step = "language" | "region";
+type Step = "language" | "region" | "notifications";
 
 // Only show languages with enough RSS sources (>3).
 // Currently: Nepali (31 sources) and English (15 sources).
@@ -37,16 +38,44 @@ export default function OnboardingWizard() {
     setTimeout(() => { setStep("region"); setAnimating(false); }, 250);
   };
 
+  const goToNotifications = () => {
+    setAnimating(true);
+    setTimeout(() => { setStep("notifications"); setAnimating(false); }, 250);
+  };
+
   const pickRegion = (region: RegionId) => {
     setRegion(region);
-    completeOnboarding();
+    goToNotifications();
   };
 
   const skipRegion = () => {
+    goToNotifications();
+  };
+
+  const finishOnboarding = () => {
     completeOnboarding();
   };
 
   const isNepali = prefs.language !== "en";
+
+  // Notifications step has its own full-screen layout; render it alone.
+  if (step === "notifications") {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+        style={{ background: "linear-gradient(160deg, #0a0a0a 0%, #1a0a0a 40%, #0a0a1a 100%)" }}
+      >
+        <NotificationsStep
+          onEnable={finishOnboarding}
+          onSkip={finishOnboarding}
+          onBack={() => setStep("region")}
+        />
+      </div>
+    );
+  }
+
+  const STEP_ORDER: Step[] = ["language", "region", "notifications"];
+  const stepIndex = STEP_ORDER.indexOf(step);
 
   return (
     <div
@@ -75,13 +104,13 @@ export default function OnboardingWizard() {
           </>
         )}
 
-        {/* Step dots */}
+        {/* Step dots — 3 segments, active = wide red, past = small white, future = faded */}
         <div className="flex justify-center gap-2 mt-4">
-          {(["language", "region"] as Step[]).map((s) => (
+          {STEP_ORDER.map((s, i) => (
             <div
               key={s}
               className={`h-1.5 rounded-full transition-all duration-300 ${
-                s === step ? "w-8 bg-red-500" : step === "region" && s === "language" ? "w-2 bg-white/40" : "w-2 bg-white/20"
+                i === stepIndex ? "w-8 bg-red-500" : i < stepIndex ? "w-2 bg-white/40" : "w-2 bg-white/20"
               }`}
             />
           ))}
