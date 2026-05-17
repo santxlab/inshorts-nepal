@@ -7,7 +7,7 @@ import NotificationsStep from "./steps/NotificationsStep";
 type Step = "language" | "region" | "notifications";
 
 // Only show languages with enough RSS sources (>3).
-// Currently: Nepali (31 sources) and English (15 sources).
+// Currently: Nepali (26 sources) and English (13 sources).
 const LANGUAGES = SUPPORTED_LANGUAGES.map((id) => ({
   id,
   flag:       LANGUAGE_CONFIG[id].flag,
