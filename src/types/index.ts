@@ -296,7 +296,10 @@ export interface SocialPost {
 export interface PushSubscription {
   userId: string;
   endpoint: string;
-  keys: { p256dh: string; auth: string };
+  // Web push uses keys; native (Expo) push uses expoPushToken instead.
+  keys?: { p256dh: string; auth: string };
+  kind?: "web" | "expo";
+  expoPushToken?: string;
   topics: TopicId[];
   language: string;
   createdAt: string;

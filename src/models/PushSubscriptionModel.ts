@@ -4,7 +4,9 @@ import type { TopicId } from "@/types";
 export interface IPushSubscription extends Document {
   userId: string;
   endpoint: string;
-  keys: { p256dh: string; auth: string };
+  keys?: { p256dh: string; auth: string };
+  kind: "web" | "expo";
+  expoPushToken?: string;
   topics: TopicId[];
   language: string;
   topicScores: Record<string, number>;
@@ -17,10 +19,13 @@ const PushSubscriptionSchema = new Schema<IPushSubscription>(
   {
     userId:   { type: String, required: true, default: "anon" },
     endpoint: { type: String, required: true, unique: true, index: true },
+    // Web push keys are optional — native (Expo) subscriptions don't have them.
     keys: {
-      p256dh: { type: String, required: true },
-      auth:   { type: String, required: true },
+      p256dh: { type: String },
+      auth:   { type: String },
     },
+    kind:          { type: String, enum: ["web", "expo"], default: "web" },
+    expoPushToken: { type: String },
     topics:      { type: [String], default: [] },
     language:    { type: String, default: "ne" },
     topicScores: { type: Object, default: {} },

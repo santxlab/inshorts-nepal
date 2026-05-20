@@ -67,11 +67,13 @@ export const pushManager = {
         await PushSubscriptionModel.findOneAndUpdate(
           { endpoint: sub.endpoint },
           {
-            userId:   sub.userId,
-            endpoint: sub.endpoint,
-            keys:     sub.keys,
-            topics:   sub.topics,
-            language: sub.language,
+            userId:        sub.userId,
+            endpoint:      sub.endpoint,
+            kind:          sub.kind ?? "web",
+            keys:          sub.keys,
+            expoPushToken: sub.expoPushToken,
+            topics:        sub.topics,
+            language:      sub.language,
           },
           { upsert: true, new: true }
         );
@@ -125,7 +127,9 @@ export const pushManager = {
         all = docs.map((d) => ({
           userId:   d.userId,
           endpoint: d.endpoint,
-          keys:     d.keys as { p256dh: string; auth: string },
+          kind:     (d.kind as "web" | "expo") ?? "web",
+          keys:     d.keys as { p256dh: string; auth: string } | undefined,
+          expoPushToken: d.expoPushToken,
           topics:   d.topics as TopicId[],
           language: d.language,
           createdAt: (d as { createdAt: Date }).createdAt?.toISOString() ?? "",
@@ -183,11 +187,6 @@ export const pushManager = {
       minBehaviorScore?: number;
     } = {}
   ): Promise<{ sent: number; failed: number; skippedCap: number }> {
-    if (!VAPID_PRIVATE_KEY) {
-      console.warn("[pushManager] VAPID keys not configured — push disabled");
-      return { sent: 0, failed: 0, skippedCap: 0 };
-    }
-
     const { isBreaking = false, articleTopics, minBehaviorScore = 40 } = options;
 
     const targets = await this.getSubscriptions({
@@ -200,41 +199,82 @@ export const pushManager = {
     let failed = 0;
     let skippedCap = 0;
 
-    const webpush = await import("web-push").catch(() => null);
-    if (!webpush) {
-      console.warn("[pushManager] web-push not installed");
-      return { sent: 0, failed: 0, skippedCap: 0 };
+    // Partition by transport: web-push (browser) vs Expo (native app).
+    const webTargets  = targets.filter((s) => s.kind !== "expo" && s.keys);
+    const expoTargets = targets.filter((s) => s.kind === "expo" && s.expoPushToken);
+
+    // ── Web push ──────────────────────────────────────────────────────────────
+    if (webTargets.length > 0 && VAPID_PRIVATE_KEY) {
+      const webpush = await import("web-push").catch(() => null);
+      if (webpush) {
+        webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+        await Promise.allSettled(
+          webTargets.map(async (sub) => {
+            if (!canSendToSubscriber(sub.endpoint, isBreaking)) { skippedCap++; return; }
+            try {
+              await webpush.sendNotification(
+                { endpoint: sub.endpoint, keys: sub.keys! },
+                JSON.stringify({
+                  title: payload.title,
+                  body:  payload.body,
+                  url:   payload.url ?? "/",
+                  icon:  payload.icon ?? "/icon-512.png",
+                  tag:   payload.tag,
+                })
+              );
+              incrementDailyCount(sub.endpoint);
+              sent++;
+            } catch (err: unknown) {
+              if ((err as { statusCode?: number }).statusCode === 410) {
+                await this.removeSubscription(sub.endpoint);
+              }
+              failed++;
+            }
+          })
+        );
+      }
     }
 
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-    await Promise.allSettled(
-      targets.map(async (sub) => {
-        if (!canSendToSubscriber(sub.endpoint, isBreaking)) {
-          skippedCap++;
-          return;
-        }
+    // ── Expo push (native app) ──────────────────────────────────────────────────
+    if (expoTargets.length > 0) {
+      const eligible = expoTargets.filter((s) => {
+        if (canSendToSubscriber(s.endpoint, isBreaking)) return true;
+        skippedCap++;
+        return false;
+      });
+      // Expo accepts up to 100 messages per request.
+      const messages = eligible.map((s) => ({
+        to: s.expoPushToken!,
+        title: payload.title,
+        body: payload.body,
+        sound: "default",
+        data: { url: payload.url ?? "/" },
+      }));
+      for (let i = 0; i < messages.length; i += 100) {
+        const chunk = messages.slice(i, i + 100);
         try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: sub.keys },
-            JSON.stringify({
-              title: payload.title,
-              body:  payload.body,
-              url:   payload.url ?? "/",
-              icon:  payload.icon ?? "/icon-512.png",
-              tag:   payload.tag,
-            })
-          );
-          incrementDailyCount(sub.endpoint);
-          sent++;
-        } catch (err: unknown) {
-          if ((err as { statusCode?: number }).statusCode === 410) {
-            await this.removeSubscription(sub.endpoint);
-          }
-          failed++;
+          const res = await fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(chunk),
+          });
+          const json = await res.json().catch(() => null);
+          const tickets: { status?: string }[] = json?.data ?? [];
+          chunk.forEach((m, idx) => {
+            const ticket = tickets[idx];
+            if (ticket?.status === "ok" || !ticket) {
+              const sub = eligible[i + idx];
+              if (sub) incrementDailyCount(sub.endpoint);
+              sent++;
+            } else {
+              failed++;
+            }
+          });
+        } catch {
+          failed += chunk.length;
         }
-      })
-    );
+      }
+    }
 
     // Log
     logs.unshift({
@@ -293,6 +333,26 @@ export const pushManager = {
     if (!sub) return;
     if (!canSendToSubscriber(endpoint, false)) return;
 
+    const title = language === "ne"
+      ? `🔥 आजको लगातार नतोड्नुहोस् (${currentStreak} दिन)!`
+      : `🔥 Keep your ${currentStreak}-day streak alive!`;
+    const body = language === "ne" ? "आज अझै एउटा समाचार पढ्नुहोस्।" : "Read at least one story today.";
+
+    // Native (Expo) subscriber
+    if (sub.kind === "expo" && sub.expoPushToken) {
+      try {
+        await fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ to: sub.expoPushToken, title, body, sound: "default", data: { url: "/" } }),
+        });
+        incrementDailyCount(endpoint);
+      } catch { /* ignore */ }
+      return;
+    }
+
+    // Web subscriber
+    if (!sub.keys) return;
     const webpush = await import("web-push").catch(() => null);
     if (!webpush || !VAPID_PRIVATE_KEY) return;
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
@@ -301,11 +361,7 @@ export const pushManager = {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: sub.keys },
         JSON.stringify({
-          title: language === "ne"
-            ? `🔥 आजको लगातार नतोड्नुहोस् (${currentStreak} दिन)!`
-            : `🔥 Keep your ${currentStreak}-day streak alive!`,
-          body: language === "ne" ? "आज अझै एउटा समाचार पढ्नुहोस्।" : "Read at least one story today.",
-          url: "/", tag: "streak-reminder", icon: "/icon-512.png",
+          title, body, url: "/", tag: "streak-reminder", icon: "/icon-512.png",
         })
       );
       incrementDailyCount(endpoint);

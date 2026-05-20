@@ -5,7 +5,25 @@ import { PushSubscription, TopicId } from "@/types";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { subscription, userId, topics, language, topicScores } = body;
+    const { subscription, userId, topics, language, topicScores, expoPushToken } = body;
+
+    // Native (Expo) app sends an expoPushToken instead of a web-push subscription.
+    if (expoPushToken) {
+      const expoSub: PushSubscription = {
+        userId: userId ?? "anon",
+        endpoint: expoPushToken,           // token is the unique key
+        kind: "expo",
+        expoPushToken,
+        topics: (topics as TopicId[]) ?? [],
+        language: language ?? "ne",
+        createdAt: new Date().toISOString(),
+      };
+      await pushManager.saveSubscription(expoSub);
+      if (topicScores && typeof topicScores === "object") {
+        pushManager.updateSubscriberBehavior(expoPushToken, topicScores);
+      }
+      return NextResponse.json({ success: true });
+    }
 
     if (!subscription?.endpoint) {
       return NextResponse.json({ error: "subscription endpoint required" }, { status: 400 });
@@ -14,6 +32,7 @@ export async function POST(req: NextRequest) {
     const pushSub: PushSubscription = {
       userId: userId ?? "anon",
       endpoint: subscription.endpoint,
+      kind: "web",
       keys: subscription.keys,
       topics: (topics as TopicId[]) ?? [],
       language: language ?? "ne",
