@@ -56,14 +56,28 @@ function guessCategory(text: string): Category {
   return "all";
 }
 
+// Named HTML entities commonly found in RSS summaries (typographic punctuation).
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
+  lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”",
+  ndash: "–", mdash: "—", hellip: "…", trade: "™",
+  copy: "©", reg: "®", deg: "°", middot: "·",
+  laquo: "«", raquo: "»", times: "×", divide: "÷",
+  rupee: "₹",
+};
+
+function decodeEntities(s: string): string {
+  return s
+    // numeric decimal: &#39; &#8217;
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(parseInt(n, 10)))
+    // numeric hex: &#x27; &#x2019;
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    // named: &rsquo; &ndash; etc.
+    .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITIES[name] ?? m);
+}
+
 function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
+  return decodeEntities(html.replace(/<[^>]*>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }
