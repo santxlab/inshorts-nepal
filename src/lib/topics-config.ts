@@ -47,5 +47,7 @@ export function detectTopics(text: string): TopicId[] {
       matched.push(topic.id);
     }
   }
-  return matched.length > 0 ? matched : ["local"];
+  // No forced default: returning [] avoids mislabeling foreign/uncategorized
+  // news as "local" (which was tagging e.g. international entertainment wrongly).
+  return matched;
 }
