@@ -240,6 +240,12 @@ export async function fetchFromSource(
       const title = stripHtml(item.title);
       if (!title) continue;
 
+      // Skip obvious test/placeholder posts that occasionally appear in feeds
+      // (e.g. a "test video" item) — they look broken as the lead story.
+      if (title.length <= 20 && /^(test|testing|demo|untitled|lorem|sample|asdf|xxx)\b/i.test(title)) {
+        continue;
+      }
+
       // Parse + validate the publish date; skip stale or implausible dates.
       const parsed = item.pubDate ? new Date(item.pubDate) : null;
       const validDate = parsed && !isNaN(parsed.getTime());
