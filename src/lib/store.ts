@@ -471,14 +471,17 @@ export const store = {
 
   addArticles(newArticles: NewsArticle[]): number {
     let added = 0;
+    const seenIds = new Set(articles.map((a) => a.id));
+    const seenTitles = new Set(articles.map((a) => a.title));
     for (const article of newArticles) {
-      const exists = articles.some(
-        (a) => a.sourceUrl === article.sourceUrl || a.title === article.title
-      );
-      if (!exists) {
-        articles.push(article);
-        added++;
-      }
+      // Dedup by stable id (re-fetch of same article) or exact title (same story
+      // syndicated across sources). NOT by sourceUrl — that falls back to the
+      // shared feed URL and would wrongly drop every article after the first.
+      if (seenIds.has(article.id) || seenTitles.has(article.title)) continue;
+      articles.push(article);
+      seenIds.add(article.id);
+      seenTitles.add(article.title);
+      added++;
     }
     // Keep max 500 articles
     if (articles.length > 500) {

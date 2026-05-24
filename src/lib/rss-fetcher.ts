@@ -1,7 +1,11 @@
 import Parser from "rss-parser";
+import { createHash } from "crypto";
 import { NewsArticle, NewsSource, Category, Language } from "@/types";
 import { store } from "./store";
 import { detectTopics } from "./topics-config";
+
+// Drop items older than this — keeps stale/mis-dated feed entries out of the feed.
+const MAX_AGE_DAYS = 21;
 
 // ─── IndexNow: instant URL submission to Google / Bing ───────────────────────
 async function submitToIndexNow(articleIds: string[]): Promise<void> {
@@ -28,6 +32,14 @@ const parser = new Parser({
   headers: {
     "User-Agent": "Mozilla/5.0 Nepal-InShort-App/1.0",
     Accept: "application/rss+xml, application/xml, text/xml, */*",
+  },
+  customFields: {
+    item: [
+      ["media:content", "mediaContent", { keepArray: true }],
+      ["media:thumbnail", "mediaThumbnail", { keepArray: true }],
+      ["content:encoded", "contentEncoded"],
+      ["image", "imageTag"],
+    ],
   },
 });
 
@@ -76,37 +88,149 @@ function decodeEntities(s: string): string {
     .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITIES[name] ?? m);
 }
 
+// Windows-1252 quirks in 0x80–0x9F: these characters map back to a single byte
+// that differs from their Unicode code point. Needed to correctly reverse
+// mojibake — without it, e.g. "‡" (U+2021) would wrongly become "!" (0x21).
+const CP1252_REVERSE: Record<number, number> = {
+  0x20ac: 0x80, 0x201a: 0x82, 0x0192: 0x83, 0x201e: 0x84, 0x2026: 0x85,
+  0x2020: 0x86, 0x2021: 0x87, 0x02c6: 0x88, 0x2030: 0x89, 0x0160: 0x8a,
+  0x2039: 0x8b, 0x0152: 0x8c, 0x017d: 0x8e, 0x2018: 0x91, 0x2019: 0x92,
+  0x201c: 0x93, 0x201d: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+  0x02dc: 0x98, 0x2122: 0x99, 0x0161: 0x9a, 0x203a: 0x9b, 0x0153: 0x9c,
+  0x017e: 0x9e, 0x0178: 0x9f,
+};
+
+// Repair classic UTF-8-decoded-as-cp1252 mojibake (e.g. "à¤¨à¥‡à¤ªà¤¾à¤²" → "नेपाल").
+// Devanagari bytes start 0xE0 → "à"; Latin punctuation shows up as "Ã"/"Â".
+// We only re-decode when those tell-tale sequences are present, so clean text is
+// untouched, and we bail if any char isn't representable as a single byte.
+function fixMojibake(s: string): string {
+  if (!/[ÃÂ]|à[¤¥¦§¨©ª¬­®]/.test(s)) return s;
+  const bytes: number[] = [];
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    if (cp <= 0xff) bytes.push(cp);
+    else if (CP1252_REVERSE[cp] !== undefined) bytes.push(CP1252_REVERSE[cp]);
+    else return s; // not a single-byte char → not this kind of mojibake; leave as-is
+  }
+  try {
+    const repaired = Buffer.from(bytes).toString("utf8");
+    if (!repaired.includes("�")) return repaired; // reject if it introduced U+FFFD
+  } catch {
+    /* fall through */
+  }
+  return s;
+}
+
 function stripHtml(html: string): string {
-  return decodeEntities(html.replace(/<[^>]*>/g, " "))
+  return fixMojibake(decodeEntities(html.replace(/<[^>]*>/g, " ")))
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function extractImage(item: Parser.Item & { [key: string]: unknown }): string | undefined {
-  // Try enclosure
-  if (item.enclosure?.url) return item.enclosure.url;
-  // Try media:content
-  const media = item["media:content"] as { $?: { url?: string } } | undefined;
-  if (media?.$?.url) return media.$.url;
-  // Try extracting from content/description
-  const content = (item["content:encoded"] as string) || item.content || item.summary || "";
-  const match = content.match(/<img[^>]+src=["']([^"']+)["']/i);
-  if (match) return match[1];
+type MediaNode = { $?: { url?: string; medium?: string; type?: string } } | undefined;
+
+// Parser item enriched with the custom fields we registered above.
+type FeedItem = Parser.Item & {
+  mediaContent?: unknown;
+  mediaThumbnail?: unknown;
+  contentEncoded?: string;
+  imageTag?: { url?: string } | string;
+  "content:encoded"?: string;
+};
+
+function looksLikeImage(url: string | undefined): url is string {
+  if (!url) return false;
+  if (!/^https?:\/\//i.test(url)) return false;
+  // Reject obvious non-images (tracking pixels are fine; videos/audio are not).
+  return !/\.(mp4|mp3|m4a|webm|mov|avi|pdf)(\?|$)/i.test(url);
+}
+
+function firstMediaUrl(node: unknown): string | undefined {
+  const arr = Array.isArray(node) ? node : node ? [node] : [];
+  for (const m of arr as MediaNode[]) {
+    const url = m?.$?.url;
+    const medium = m?.$?.medium;
+    const type = m?.$?.type;
+    if (url && looksLikeImage(url) && (!medium || medium === "image") && (!type || type.startsWith("image"))) {
+      return url;
+    }
+  }
   return undefined;
+}
+
+function extractImage(item: FeedItem): string | undefined {
+  // 1. Enclosure (only when it's actually an image)
+  const enc = item.enclosure;
+  if (enc?.url && looksLikeImage(enc.url) && (!enc.type || enc.type.startsWith("image"))) {
+    return enc.url;
+  }
+  // 2. media:content / media:thumbnail (may be arrays — pick the first image)
+  const fromMediaContent = firstMediaUrl(item.mediaContent);
+  if (fromMediaContent) return fromMediaContent;
+  const fromThumb = firstMediaUrl(item.mediaThumbnail);
+  if (fromThumb) return fromThumb;
+  // 3. <image> tag with a url child
+  const imageTag = item.imageTag as { url?: string } | string | undefined;
+  if (typeof imageTag === "string" && looksLikeImage(imageTag)) return imageTag;
+  if (imageTag && typeof imageTag === "object" && looksLikeImage(imageTag.url)) return imageTag.url;
+  // 4. First <img> inside the article body / description
+  const content =
+    (item.contentEncoded as string) ||
+    (item["content:encoded"] as string) ||
+    item.content ||
+    item.summary ||
+    "";
+  const match = content.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (match && looksLikeImage(match[1])) return match[1];
+  return undefined;
+}
+
+// Stable, collision-free article id: hash the FULL canonical key.
+// (The old `base64(link).slice(0,16)` only captured the first 12 bytes — the
+// shared domain prefix — so every article from a source collapsed to one id.)
+function makeArticleId(sourceId: string, key: string): string {
+  const hash = createHash("sha1").update(key).digest("hex").slice(0, 16);
+  return `${sourceId}-${hash}`;
+}
+
+// Fetch raw bytes and decode as UTF-8 ourselves, then hand the string to the
+// parser. This stops feeds with a missing/incorrect charset header from being
+// mis-decoded into mojibake. Falls back to parser.parseURL on any failure.
+async function loadFeed(source: NewsSource) {
+  try {
+    const res = await fetch(source.url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 Nepal-InShort-App/1.0",
+        Accept: "application/rss+xml, application/xml, text/xml, */*",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    const text = new TextDecoder("utf-8").decode(buf);
+    return await parser.parseString(text);
+  } catch {
+    return await parser.parseURL(source.url);
+  }
 }
 
 export async function fetchFromSource(
   source: NewsSource
 ): Promise<NewsArticle[]> {
   try {
-    const feed = await parser.parseURL(source.url);
+    const feed = await loadFeed(source);
     const articles: NewsArticle[] = [];
+    const now = Date.now();
+    const maxAgeMs = MAX_AGE_DAYS * 24 * 3600 * 1000;
 
     for (const item of feed.items.slice(0, 20)) {
       if (!item.title) continue;
 
+      const fi = item as FeedItem;
       const rawSummary =
-        (item["content:encoded"] as string) ||
+        fi.contentEncoded ||
+        fi["content:encoded"] ||
         item.content ||
         item.summary ||
         item.contentSnippet ||
@@ -114,13 +238,24 @@ export async function fetchFromSource(
 
       const cleanSummary = stripHtml(rawSummary).slice(0, 300);
       const title = stripHtml(item.title);
-      const category = guessCategory(title + " " + cleanSummary);
-      const image = extractImage(item as Parser.Item & { [key: string]: unknown });
+      if (!title) continue;
 
+      // Parse + validate the publish date; skip stale or implausible dates.
+      const parsed = item.pubDate ? new Date(item.pubDate) : null;
+      const validDate = parsed && !isNaN(parsed.getTime());
+      const publishedMs = validDate ? parsed.getTime() : now;
+      if (validDate) {
+        const age = now - publishedMs;
+        if (age > maxAgeMs) continue;            // too old (e.g. 953-day article)
+        if (publishedMs > now + 24 * 3600 * 1000) continue; // future-dated junk
+      }
+
+      const category = guessCategory(title + " " + cleanSummary);
+      const image = extractImage(fi);
       const detectedTopics = detectTopics(title + " " + cleanSummary);
 
       articles.push({
-        id: `${source.id}-${Buffer.from(item.link || item.title || Date.now().toString()).toString("base64").slice(0, 16)}`,
+        id: makeArticleId(source.id, item.link || item.guid || title),
         title,
         summary: cleanSummary || title,
         imageUrl: image,
@@ -129,9 +264,7 @@ export async function fetchFromSource(
         category,
         topics: detectedTopics,
         language: source.language,
-        publishedAt: item.pubDate
-          ? new Date(item.pubDate).toISOString()
-          : new Date().toISOString(),
+        publishedAt: new Date(publishedMs).toISOString(),
         fetchedAt: new Date().toISOString(),
         isApproved: true,
         readTimeSeconds: Math.max(30, Math.floor(cleanSummary.split(" ").length * 0.4)),
