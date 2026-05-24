@@ -17,6 +17,10 @@ build/
 .env.test.local
 .env.production.local
 
+# Firebase service-account key (FCM push) — never commit
+fcm-service-account.json
+*-firebase-adminsdk-*.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*

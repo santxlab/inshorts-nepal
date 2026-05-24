@@ -296,10 +296,11 @@ export interface SocialPost {
 export interface PushSubscription {
   userId: string;
   endpoint: string;
-  // Web push uses keys; native (Expo) push uses expoPushToken instead.
+  // Web push uses keys; Expo push uses expoPushToken; native FCM uses fcmToken.
   keys?: { p256dh: string; auth: string };
-  kind?: "web" | "expo";
+  kind?: "web" | "expo" | "fcm";
   expoPushToken?: string;
+  fcmToken?: string;
   topics: TopicId[];
   language: string;
   createdAt: string;

@@ -5,8 +5,9 @@ export interface IPushSubscription extends Document {
   userId: string;
   endpoint: string;
   keys?: { p256dh: string; auth: string };
-  kind: "web" | "expo";
+  kind: "web" | "expo" | "fcm";
   expoPushToken?: string;
+  fcmToken?: string;
   topics: TopicId[];
   language: string;
   topicScores: Record<string, number>;
@@ -24,8 +25,9 @@ const PushSubscriptionSchema = new Schema<IPushSubscription>(
       p256dh: { type: String },
       auth:   { type: String },
     },
-    kind:          { type: String, enum: ["web", "expo"], default: "web" },
+    kind:          { type: String, enum: ["web", "expo", "fcm"], default: "web" },
     expoPushToken: { type: String },
+    fcmToken:      { type: String },
     topics:      { type: [String], default: [] },
     language:    { type: String, default: "ne" },
     topicScores: { type: Object, default: {} },

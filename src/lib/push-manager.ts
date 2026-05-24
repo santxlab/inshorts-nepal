@@ -4,6 +4,7 @@
 import type { PushSubscription, PushNotificationLog, TopicId } from "@/types";
 import { connectDB } from "./db";
 import { PushSubscriptionModel } from "@/models/PushSubscriptionModel";
+import { sendFcm, isFcmConfigured } from "./fcm";
 
 // ── In-memory fallback (used when MongoDB is unavailable) ─────────────────────
 const memSubs = new Map<string, PushSubscription>();
@@ -72,6 +73,7 @@ export const pushManager = {
             kind:          sub.kind ?? "web",
             keys:          sub.keys,
             expoPushToken: sub.expoPushToken,
+            fcmToken:      sub.fcmToken,
             topics:        sub.topics,
             language:      sub.language,
           },
@@ -127,9 +129,10 @@ export const pushManager = {
         all = docs.map((d) => ({
           userId:   d.userId,
           endpoint: d.endpoint,
-          kind:     (d.kind as "web" | "expo") ?? "web",
+          kind:     (d.kind as "web" | "expo" | "fcm") ?? "web",
           keys:     d.keys as { p256dh: string; auth: string } | undefined,
           expoPushToken: d.expoPushToken,
+          fcmToken: d.fcmToken,
           topics:   d.topics as TopicId[],
           language: d.language,
           createdAt: (d as { createdAt: Date }).createdAt?.toISOString() ?? "",
@@ -199,9 +202,10 @@ export const pushManager = {
     let failed = 0;
     let skippedCap = 0;
 
-    // Partition by transport: web-push (browser) vs Expo (native app).
-    const webTargets  = targets.filter((s) => s.kind !== "expo" && s.keys);
+    // Partition by transport: web-push (browser) · Expo · direct FCM (native app).
+    const webTargets  = targets.filter((s) => s.kind === "web" && s.keys);
     const expoTargets = targets.filter((s) => s.kind === "expo" && s.expoPushToken);
+    const fcmTargets  = targets.filter((s) => s.kind === "fcm" && s.fcmToken);
 
     // ── Web push ──────────────────────────────────────────────────────────────
     if (webTargets.length > 0 && VAPID_PRIVATE_KEY) {
@@ -276,6 +280,30 @@ export const pushManager = {
       }
     }
 
+    // ── Direct FCM (native app) ─────────────────────────────────────────────────
+    if (fcmTargets.length > 0 && isFcmConfigured()) {
+      await Promise.allSettled(
+        fcmTargets.map(async (sub) => {
+          if (!canSendToSubscriber(sub.endpoint, isBreaking)) { skippedCap++; return; }
+          const result = await sendFcm({
+            token: sub.fcmToken!,
+            title: payload.title,
+            body: payload.body,
+            data: { url: payload.url ?? "/" },
+          });
+          if (result === "ok") {
+            incrementDailyCount(sub.endpoint);
+            sent++;
+          } else if (result === "invalid") {
+            await this.removeSubscription(sub.endpoint); // prune dead token
+            failed++;
+          } else {
+            failed++;
+          }
+        })
+      );
+    }
+
     // Log
     logs.unshift({
       id: `push-${Date.now()}`,
@@ -337,6 +365,14 @@ export const pushManager = {
       ? `🔥 आजको लगातार नतोड्नुहोस् (${currentStreak} दिन)!`
       : `🔥 Keep your ${currentStreak}-day streak alive!`;
     const body = language === "ne" ? "आज अझै एउटा समाचार पढ्नुहोस्।" : "Read at least one story today.";
+
+    // Native (direct FCM) subscriber
+    if (sub.kind === "fcm" && sub.fcmToken) {
+      const r = await sendFcm({ token: sub.fcmToken, title, body, data: { url: "/" } });
+      if (r === "ok") incrementDailyCount(endpoint);
+      else if (r === "invalid") await this.removeSubscription(endpoint);
+      return;
+    }
 
     // Native (Expo) subscriber
     if (sub.kind === "expo" && sub.expoPushToken) {

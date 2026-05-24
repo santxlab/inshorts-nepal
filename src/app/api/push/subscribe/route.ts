@@ -5,7 +5,25 @@ import { PushSubscription, TopicId } from "@/types";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { subscription, userId, topics, language, topicScores, expoPushToken } = body;
+    const { subscription, userId, topics, language, topicScores, expoPushToken, fcmToken } = body;
+
+    // Native app (direct FCM) sends a raw FCM device token.
+    if (fcmToken) {
+      const fcmSub: PushSubscription = {
+        userId: userId ?? "anon",
+        endpoint: fcmToken,                // token is the unique key
+        kind: "fcm",
+        fcmToken,
+        topics: (topics as TopicId[]) ?? [],
+        language: language ?? "ne",
+        createdAt: new Date().toISOString(),
+      };
+      await pushManager.saveSubscription(fcmSub);
+      if (topicScores && typeof topicScores === "object") {
+        pushManager.updateSubscriberBehavior(fcmToken, topicScores);
+      }
+      return NextResponse.json({ success: true });
+    }
 
     // Native (Expo) app sends an expoPushToken instead of a web-push subscription.
     if (expoPushToken) {
