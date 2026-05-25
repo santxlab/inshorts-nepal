@@ -43,6 +43,14 @@ const parser = new Parser({
   },
 });
 
+// Conservative breaking-news detector: a strong keyword AND very fresh, so the
+// 15-min "breaking" push only fires for genuine, time-sensitive stories.
+const BREAKING_RX = /breaking news|breaking:|\bjust in\b|\burgent\b|developing story|ब्रेकिङ|तत्काल समाचार|तत्कालै/i;
+function detectBreaking(text: string, publishedMs: number, now: number): boolean {
+  if (now - publishedMs > 2 * 3600 * 1000) return false; // only within ~2h of publish
+  return BREAKING_RX.test(text);
+}
+
 function guessCategory(text: string): Category {
   const lower = text.toLowerCase();
   if (/\b(sport|cricket|football|nfl|nba|खेल|क्रिकेट)\b/.test(lower))
@@ -259,6 +267,7 @@ export async function fetchFromSource(
       const category = guessCategory(title + " " + cleanSummary);
       const image = extractImage(fi);
       const detectedTopics = detectTopics(title + " " + cleanSummary);
+      const isBreaking = detectBreaking(title + " " + cleanSummary, publishedMs, now);
 
       articles.push({
         id: makeArticleId(source.id, item.link || item.guid || title),
@@ -269,6 +278,7 @@ export async function fetchFromSource(
         sourceName: source.name,
         category,
         topics: detectedTopics,
+        ...(isBreaking ? { isBreaking: true } : {}),
         language: source.language,
         publishedAt: new Date(publishedMs).toISOString(),
         fetchedAt: new Date().toISOString(),

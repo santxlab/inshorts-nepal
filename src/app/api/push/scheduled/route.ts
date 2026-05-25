@@ -11,6 +11,11 @@ import { store } from "@/lib/store";
 
 const CRON_SECRET = process.env.CRON_SECRET ?? "inshorts-cron-2026";
 
+// Remember breaking stories already pushed, so the 15-min cron doesn't re-send
+// the same article while it's still inside the 30-min freshness window.
+// (In-memory; resets on restart — acceptable for time-sensitive alerts.)
+const sentBreakingIds = new Set<string>();
+
 export async function POST(req: NextRequest) {
   try {
     const { type, secret, language } = await req.json();
@@ -63,11 +68,18 @@ export async function POST(req: NextRequest) {
         a.isBreaking && (now - new Date(a.publishedAt).getTime()) < 30 * 60 * 1000
       );
 
-      if (breakingArticles.length === 0) {
-        return NextResponse.json({ success: true, type: "breaking", sent: 0, message: "No fresh breaking news" });
+      // Skip stories we've already alerted on within this freshness window.
+      const fresh = breakingArticles.find((a) => !sentBreakingIds.has(a.id));
+      if (!fresh) {
+        return NextResponse.json({ success: true, type: "breaking", sent: 0, message: "No new breaking news" });
       }
 
-      const article = breakingArticles[0];
+      const article = fresh;
+      sentBreakingIds.add(article.id);
+      // Keep the set from growing unbounded over a long uptime.
+      if (sentBreakingIds.size > 500) {
+        sentBreakingIds.delete(sentBreakingIds.values().next().value as string);
+      }
       const title = lang === "ne" ? "🚨 ब्रेकिङ न्युज" : "🚨 Breaking News";
       const result = await pushManager.sendToSubscribers(
         {
