@@ -40,7 +40,7 @@ export default function TermsOfService() {
 
         <p style={p}>
           These Terms of Service (&quot;Terms&quot;) govern your use of the InShorts Nepal mobile
-          application and website (the &quot;Service&quot;), operated by Rocket Internet (&quot;we&quot;,
+          application and website (the &quot;Service&quot;), operated by Rocket Internet Pvt. Ltd. (&quot;we&quot;,
           &quot;us&quot;, or &quot;our&quot;). By using the Service, you agree to these Terms. If you
           do not agree, please do not use the Service.
         </p>
@@ -121,9 +121,9 @@ export default function TermsOfService() {
 
         <h2 style={h2}>12. Contact</h2>
         <p style={p}>
-          <strong>Rocket Internet</strong>
+          <strong>Rocket Internet Pvt. Ltd.</strong>
           <br />
-          Rzone-3, Sarfabad, Noida Sector 73, Gautam Buddha Nagar — 201301
+          Butwal, Dinganagar, Rupandehi, Nepal
           <br />
           Email:{" "}
           <a style={a} href="mailto:info@inshortsnepal.org">

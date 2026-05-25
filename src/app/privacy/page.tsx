@@ -41,7 +41,7 @@ export default function PrivacyPolicy() {
         <p style={muted}>Last updated: {EFFECTIVE_DATE}</p>
 
         <p style={p}>
-          This Privacy Policy explains how Rocket Internet (&quot;we&quot;, &quot;us&quot;, or
+          This Privacy Policy explains how Rocket Internet Pvt. Ltd. (&quot;we&quot;, &quot;us&quot;, or
           &quot;our&quot;) collects, uses, and protects your information when you use the InShorts
           Nepal mobile application and website (the &quot;Service&quot;). By using the Service, you
           agree to the practices described below.
@@ -141,9 +141,9 @@ export default function PrivacyPolicy() {
 
         <h2 style={h2}>10. Contact Us</h2>
         <p style={p}>
-          <strong>Rocket Internet</strong>
+          <strong>Rocket Internet Pvt. Ltd.</strong>
           <br />
-          Rzone-3, Sarfabad, Noida Sector 73, Gautam Buddha Nagar — 201301
+          Butwal, Dinganagar, Rupandehi, Nepal
           <br />
           Email:{" "}
           <a style={a} href="mailto:info@inshortsnepal.org">
