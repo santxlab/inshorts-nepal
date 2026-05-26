@@ -280,6 +280,8 @@ export async function fetchFromSource(
         topics: detectedTopics,
         ...(isBreaking ? { isBreaking: true } : {}),
         language: source.language,
+        origin: source.origin ?? "np",          // Wave 1: language-aware feed mix
+        sourceQuality: source.quality ?? 6,     // Wave 1: cluster representative tiebreak
         publishedAt: new Date(publishedMs).toISOString(),
         fetchedAt: new Date().toISOString(),
         isApproved: true,

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { store } from "@/lib/store";
 import { fetchAllSources } from "@/lib/rss-fetcher";
+import { buildMixedFeed, softCluster, enforceMinFloor } from "@/lib/feed-mixer";
 import { TopicId } from "@/types";
+
+// Wave 1: minimum stories per page after clustering. If clustering shrinks
+// the feed below this, we serve the pre-clustered list so users never see an
+// empty / near-empty feed.
+const MIN_FEED_FLOOR = 20;
 
 // Per-language fetch state (module-level, resets on cold start)
 const fetchState: Record<string, { inProgress: boolean; lastFetch: number }> = {};
@@ -47,6 +53,16 @@ export async function GET(req: NextRequest) {
   if (topic) {
     const byTopic = all.filter((a) => a.topics?.includes(topic));
     all = byTopic.length >= 3 ? byTopic : all;
+  }
+
+  // Wave 1: language-aware 80/10/10 mix, then soft cluster near-duplicates,
+  // then guarantee a minimum-size feed so users never see an empty screen.
+  // (Set ?mix=off to bypass for debugging.)
+  const mixOff = searchParams.get("mix") === "off";
+  if (!mixOff) {
+    const mixed = buildMixedFeed(all);
+    const clustered = softCluster(mixed);
+    all = enforceMinFloor(clustered, mixed, MIN_FEED_FLOOR);
   }
 
   const start = (page - 1) * limit;

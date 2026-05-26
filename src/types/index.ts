@@ -118,6 +118,9 @@ export interface NewsArticle {
   viewCount?: number;
   slug?: string;          // SEO-friendly URL slug
   contentType?: "editorial" | "sponsored" | "advertisement";
+  // Wave 1: content origin and source quality for language-aware mixing + clustering.
+  origin?: "np" | "in" | "global"; // where the content focus is — defaults to "np" if absent
+  sourceQuality?: number;          // 1–10 trust/quality weight (used in clustering tie-break)
 }
 
 export interface NewsSource {
@@ -130,6 +133,10 @@ export interface NewsSource {
   isActive: boolean;
   lastFetched?: string;
   articleCount?: number;
+  // Wave 1: origin and quality. Origin drives the 80/10/10 language-aware feed mix;
+  // quality biases cluster representative selection and source affinity.
+  origin?: "np" | "in" | "global"; // defaults to "np" if absent
+  quality?: number;                // 1–10 (default 6)
 }
 
 export interface AdminStats {

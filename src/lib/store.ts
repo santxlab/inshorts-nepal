@@ -123,6 +123,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 9,
     },
     {
       id: "en-okeng",
@@ -131,6 +133,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 8,
     },
     {
       id: "en-nkeng",
@@ -139,6 +143,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-khabarhub",
@@ -147,6 +153,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-annapurna",
@@ -155,6 +163,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-rising",
@@ -163,6 +173,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-spotlight",
@@ -171,6 +183,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-nepalnews",
@@ -179,6 +193,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-ictframe",
@@ -187,6 +203,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "technology",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-ratopati",
@@ -195,6 +213,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-nepalpress",
@@ -203,6 +223,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "en-lokpath",
@@ -211,6 +233,8 @@ function getDefaultSources(): NewsSource[] {
       language: "en",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     // Nepali Sources
     {
@@ -221,6 +245,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-onlinekhabar",
@@ -230,6 +256,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 9,
     },
     {
       id: "ne-setopati",
@@ -239,6 +267,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 9,
     },
     {
       id: "ne-nagarik",
@@ -248,6 +278,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 9,
     },
     {
       id: "ne-annapurna",
@@ -257,6 +289,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-gorkhapatra",
@@ -266,6 +300,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-deshsanchar",
@@ -275,6 +311,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-nepalpress",
@@ -284,6 +322,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-imagekhabar",
@@ -293,6 +333,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-bizmandu",
@@ -302,6 +344,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "business",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-karobar",
@@ -311,6 +355,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "business",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-himalpress",
@@ -320,6 +366,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-sourya",
@@ -329,6 +377,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-rajdhani",
@@ -338,6 +388,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-nepalkhabar",
@@ -347,6 +399,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-nepalsamaya",
@@ -356,6 +410,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-dainiknepal",
@@ -365,6 +421,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-makalu",
@@ -374,6 +432,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-lokantar",
@@ -383,6 +443,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-dcnepal",
@@ -392,6 +454,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-reporters",
@@ -401,6 +465,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-pahilopost",
@@ -410,6 +476,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-bbc",
@@ -419,6 +487,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 10,
     },
     {
       id: "ne-lokpath",
@@ -428,6 +498,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-pratahkal",
@@ -437,6 +509,8 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
     },
     {
       id: "ne-meronews",
@@ -446,6 +520,134 @@ function getDefaultSources(): NewsSource[] {
       language: "ne",
       category: "all",
       isActive: true,
+      origin: "np",
+      quality: 6,
+    },
+    // ───── Additional Nepal-focused English sources ─────
+    {
+      id: "en-himalayan",
+      name: "Himalayan Times",
+      url: "https://thehimalayantimes.com/feed",
+      language: "en",
+      category: "all",
+      isActive: true,
+      origin: "np",
+      quality: 8,
+    },
+    {
+      id: "en-republica",
+      name: "My Republica",
+      url: "https://myrepublica.nagariknetwork.com/feed",
+      language: "en",
+      category: "all",
+      isActive: true,
+      origin: "np",
+      quality: 8,
+    },
+    {
+      id: "en-nepalitimes",
+      name: "Nepali Times",
+      url: "https://www.nepalitimes.com/feed",
+      language: "en",
+      category: "all",
+      isActive: true,
+      origin: "np",
+      quality: 8,
+    },
+    {
+      id: "en-record",
+      name: "The Record Nepal",
+      url: "https://www.recordnepal.com/rss/",
+      language: "en",
+      category: "all",
+      isActive: true,
+      origin: "np",
+      quality: 7,
+    },
+    // ───── Additional Nepal Nepali sources ─────
+    {
+      id: "ne-ekantipur",
+      name: "कान्तिपुर",
+      nameNe: "कान्तिपुर",
+      url: "https://ekantipur.com/feed",
+      language: "ne",
+      category: "all",
+      isActive: true,
+      origin: "np",
+      quality: 9,
+    },
+    {
+      id: "ne-nayapatrika",
+      name: "नयाँ पत्रिका",
+      nameNe: "नयाँ पत्रिका",
+      url: "https://nayapatrikadaily.com/feed/",
+      language: "ne",
+      category: "all",
+      isActive: true,
+      origin: "np",
+      quality: 7,
+    },
+    // ───── India-focused English sources (10% of EN feed) ─────
+    {
+      id: "in-bbc",
+      name: "BBC India",
+      url: "https://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
+      language: "en",
+      category: "all",
+      isActive: true,
+      origin: "in",
+      quality: 9,
+    },
+    {
+      id: "in-hindu",
+      name: "The Hindu",
+      url: "https://www.thehindu.com/news/national/feeder/default.rss",
+      language: "en",
+      category: "all",
+      isActive: true,
+      origin: "in",
+      quality: 9,
+    },
+    {
+      id: "in-ht",
+      name: "Hindustan Times",
+      url: "https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml",
+      language: "en",
+      category: "all",
+      isActive: true,
+      origin: "in",
+      quality: 7,
+    },
+    // ───── Global English sources (10% of EN feed) ─────
+    {
+      id: "global-bbc-world",
+      name: "BBC World",
+      url: "https://feeds.bbci.co.uk/news/world/rss.xml",
+      language: "en",
+      category: "world",
+      isActive: true,
+      origin: "global",
+      quality: 10,
+    },
+    {
+      id: "global-aljazeera",
+      name: "Al Jazeera",
+      url: "https://www.aljazeera.com/xml/rss/all.xml",
+      language: "en",
+      category: "world",
+      isActive: true,
+      origin: "global",
+      quality: 8,
+    },
+    {
+      id: "global-guardian-world",
+      name: "The Guardian World",
+      url: "https://www.theguardian.com/world/rss",
+      language: "en",
+      category: "world",
+      isActive: true,
+      origin: "global",
+      quality: 8,
     },
   ];
 }
