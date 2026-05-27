@@ -19,6 +19,7 @@ import { loadProfile } from "@/lib/user-behavior-store";
 import { defaultProfile, likelyIntent, SessionIntent } from "@/lib/behavior-server";
 import { rankFeed, RankContext } from "@/lib/ranking-server";
 import { getCachedTranslations } from "@/lib/translation-service";
+import { getCachedSummaries } from "@/lib/summary-service";
 import { TopicId, Category, NewsArticle } from "@/types";
 
 const MIN_FEED_FLOOR = 20;
@@ -96,7 +97,23 @@ export async function GET(req: NextRequest) {
 
   // ── 4. Paginate ──
   const start = (page - 1) * limit;
-  const items = ranked.slice(start, start + limit);
+  let items = ranked.slice(start, start + limit);
+
+  // ── 5. Phase 2.2: swap RSS summaries for the cached inshorts-style AI
+  // summary (DeepSeek via DO Agent) when available. Cache-only — no LLM calls
+  // on the request path.
+  const summaryMap = await getCachedSummaries(items.map((a) => a.id), lang);
+  let summarizedCount = 0;
+  if (summaryMap.size > 0) {
+    items = items.map((a) => {
+      const s = summaryMap.get(a.id);
+      if (s) {
+        summarizedCount++;
+        return { ...a, summary: s };
+      }
+      return a;
+    });
+  }
 
   return NextResponse.json({
     articles: items,
@@ -105,5 +122,6 @@ export async function GET(req: NextRequest) {
     hasMore: start + limit < ranked.length,
     personalized: hasSignal,
     translatedInThisPage: items.filter((a) => translated.some((t) => t.id === a.id)).length,
+    summarizedInThisPage: summarizedCount,
   });
 }

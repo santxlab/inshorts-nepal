@@ -6,6 +6,8 @@ import { detectTopics } from "./topics-config";
 import { detectCrossSourceBreaking } from "./breaking-detector";
 import { translateBatch } from "./translation-service";
 import { isOpenAIConfigured } from "./openai-client";
+import { summarizeBatch } from "./summary-service";
+import { isDoAgentConfigured } from "./do-agent-client";
 
 // Drop items older than this — keeps stale/mis-dated feed entries out of the feed.
 const MAX_AGE_DAYS = 21;
@@ -343,24 +345,40 @@ export async function fetchAllSources(
     console.error("[breaking-detector] failed:", err);
   }
 
-  // Phase 2.2: kick off background AI translation of foreign-language articles
-  // (origin in/global English ↔ Nepali users, etc.). Cache-hit short-circuits
-  // mean only NEW articles actually hit OpenAI on each cycle.
-  if (isOpenAIConfigured()) {
-    // Fire and forget — must not block the fetch response.
-    setImmediate(() => {
-      const articles = store.getAllArticles().filter(
+  // Phase 2.2: background AI work after each fetch. Both jobs are cache-aware
+  // — only NEW articles actually hit the LLMs on each cycle.
+  // (a) TRANSLATE foreign-language articles (IN/Global English ↔ Nepali) — OpenAI.
+  // (b) SUMMARIZE every article into a 55-65 word inshorts version — DO Agent (DeepSeek).
+  setImmediate(() => {
+    if (isOpenAIConfigured()) {
+      const foreign = store.getAllArticles().filter(
         (a) => a.origin === "in" || a.origin === "global"
       );
-      translateBatch(articles, ["ne", "en"], 2)
+      translateBatch(foreign, ["ne", "en"], 2)
         .then((r) => {
-          if (r.succeeded > 0) {
-            console.log(`[translation] new: ${r.succeeded} · cached: ${r.cached} · skipped(no-need): ${r.attempted - r.succeeded - r.cached}`);
-          }
+          if (r.succeeded > 0) console.log(`[translation] new: ${r.succeeded} · cached: ${r.cached}`);
         })
         .catch((err) => console.error("[translation] batch failed:", err));
-    });
-  }
+    }
+    if (isDoAgentConfigured()) {
+      const all = store.getAllArticles();
+      // Summarize in each language separately, prioritizing the article's own language
+      // first so the cheapest case (no translation needed) gets cached first.
+      const ne = all.filter((a) => a.language === "ne");
+      const en = all.filter((a) => a.language === "en");
+      Promise.all([
+        summarizeBatch(ne, "ne", 2),
+        summarizeBatch(en, "en", 2),
+      ])
+        .then(([rn, re]) => {
+          const total = rn.succeeded + re.succeeded;
+          if (total > 0) {
+            console.log(`[summary] new: ne=${rn.succeeded} en=${re.succeeded} · cached: ne=${rn.cached} en=${re.cached}`);
+          }
+        })
+        .catch((err) => console.error("[summary] batch failed:", err));
+    }
+  });
 
   return { added: totalAdded, sources: fetchedSources };
 }
