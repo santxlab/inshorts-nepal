@@ -352,7 +352,7 @@ export async function fetchAllSources(
       const articles = store.getAllArticles().filter(
         (a) => a.origin === "in" || a.origin === "global"
       );
-      translateBatch(articles, ["ne", "en"], 4)
+      translateBatch(articles, ["ne", "en"], 2)
         .then((r) => {
           if (r.succeeded > 0) {
             console.log(`[translation] new: ${r.succeeded} · cached: ${r.cached} · skipped(no-need): ${r.attempted - r.succeeded - r.cached}`);

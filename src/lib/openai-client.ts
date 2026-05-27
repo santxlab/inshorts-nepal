@@ -5,7 +5,7 @@
 
 const API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_MS = 60_000;
 
 export function isOpenAIConfigured(): boolean {
   return !!process.env.OPENAI_API_KEY;
