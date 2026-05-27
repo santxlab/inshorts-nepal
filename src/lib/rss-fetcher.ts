@@ -4,6 +4,8 @@ import { NewsArticle, NewsSource, Category, Language } from "@/types";
 import { store } from "./store";
 import { detectTopics } from "./topics-config";
 import { detectCrossSourceBreaking } from "./breaking-detector";
+import { translateBatch } from "./translation-service";
+import { isOpenAIConfigured } from "./openai-client";
 
 // Drop items older than this — keeps stale/mis-dated feed entries out of the feed.
 const MAX_AGE_DAYS = 21;
@@ -339,6 +341,25 @@ export async function fetchAllSources(
     if (flagged > 0) console.log(`[breaking-detector] flagged ${flagged} cross-source breaking stories`);
   } catch (err) {
     console.error("[breaking-detector] failed:", err);
+  }
+
+  // Phase 2.2: kick off background AI translation of foreign-language articles
+  // (origin in/global English ↔ Nepali users, etc.). Cache-hit short-circuits
+  // mean only NEW articles actually hit OpenAI on each cycle.
+  if (isOpenAIConfigured()) {
+    // Fire and forget — must not block the fetch response.
+    setImmediate(() => {
+      const articles = store.getAllArticles().filter(
+        (a) => a.origin === "in" || a.origin === "global"
+      );
+      translateBatch(articles, ["ne", "en"], 4)
+        .then((r) => {
+          if (r.succeeded > 0) {
+            console.log(`[translation] new: ${r.succeeded} · cached: ${r.cached} · skipped(no-need): ${r.attempted - r.succeeded - r.cached}`);
+          }
+        })
+        .catch((err) => console.error("[translation] batch failed:", err));
+    });
   }
 
   return { added: totalAdded, sources: fetchedSources };

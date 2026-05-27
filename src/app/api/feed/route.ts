@@ -18,7 +18,8 @@ import { buildMixedFeed, softCluster, enforceMinFloor } from "@/lib/feed-mixer";
 import { loadProfile } from "@/lib/user-behavior-store";
 import { defaultProfile, likelyIntent, SessionIntent } from "@/lib/behavior-server";
 import { rankFeed, RankContext } from "@/lib/ranking-server";
-import { TopicId, Category } from "@/types";
+import { getCachedTranslations } from "@/lib/translation-service";
+import { TopicId, Category, NewsArticle } from "@/types";
 
 const MIN_FEED_FLOOR = 20;
 
@@ -37,8 +38,35 @@ export async function GET(req: NextRequest) {
     searchParams.get("deviceId") ||
     null;
 
-  // ── 1. Candidate articles (same filters as /api/news) ──
-  let all = store.getArticles(lang, category);
+  // ── 1. Candidate articles ──
+  // Native-language articles (no translation needed).
+  const nativePool = store.getArticles(lang, category);
+
+  // Phase 2.2: foreign-language IN/Global articles get pulled in too, but ONLY
+  // if a cached translation already exists. (Misses are translated by the
+  // background job after each fetch — by the time the user requests, hits exist.)
+  const otherLang: "ne" | "en" = lang === "ne" ? "en" : "ne";
+  const foreignPool = store
+    .getArticles(otherLang, category)
+    .filter((a) => a.origin === "in" || a.origin === "global");
+
+  let translated: NewsArticle[] = [];
+  if (foreignPool.length > 0) {
+    const cache = await getCachedTranslations(
+      foreignPool.map((a) => a.id),
+      lang
+    );
+    translated = foreignPool
+      .filter((a) => cache.has(`${a.id}|${lang}`))
+      .map((a) => {
+        const t = cache.get(`${a.id}|${lang}`)!;
+        // Spread keeps origin/quality/topics/etc.; override only title+summary+language.
+        return { ...a, title: t.title, summary: t.summary, language: lang };
+      });
+  }
+
+  let all = [...nativePool, ...translated];
+
   if (topic) {
     const byTopic = all.filter((a) => a.topics?.includes(topic));
     all = byTopic.length >= 3 ? byTopic : all;
@@ -76,5 +104,6 @@ export async function GET(req: NextRequest) {
     page,
     hasMore: start + limit < ranked.length,
     personalized: hasSignal,
+    translatedInThisPage: items.filter((a) => translated.some((t) => t.id === a.id)).length,
   });
 }
