@@ -182,7 +182,18 @@ export const pushManager = {
 
   // ── Core send ─────────────────────────────────────────────────────────────
   async sendToSubscribers(
-    payload: { title: string; body: string; url?: string; icon?: string; tag?: string },
+    payload: {
+      title: string;
+      body: string;
+      url?: string;
+      icon?: string;
+      tag?: string;
+      // Phase 2.2: extras carried in the notification `data` so the mobile
+      // tap handler can deep-link straight to the article.
+      articleId?: string;
+      sourceUrl?: string;
+      language?: string;
+    },
     options: {
       filter?: { topics?: TopicId[]; language?: string };
       isBreaking?: boolean;
@@ -191,6 +202,14 @@ export const pushManager = {
     } = {}
   ): Promise<{ sent: number; failed: number; skippedCap: number }> {
     const { isBreaking = false, articleTopics, minBehaviorScore = 40 } = options;
+
+    // Notification data payload — mobile reads this on tap and opens the
+    // article URL in our in-app browser. Empty fields are omitted so we
+    // don't ship "undefined" strings to FCM/Expo.
+    const notifData: Record<string, string> = { url: payload.url ?? "/" };
+    if (payload.articleId)  notifData.articleId  = payload.articleId;
+    if (payload.sourceUrl)  notifData.sourceUrl  = payload.sourceUrl;
+    if (payload.language)   notifData.language   = payload.language;
 
     const targets = await this.getSubscriptions({
       ...options.filter,
@@ -252,7 +271,7 @@ export const pushManager = {
         title: payload.title,
         body: payload.body,
         sound: "default",
-        data: { url: payload.url ?? "/" },
+        data: notifData,
       }));
       for (let i = 0; i < messages.length; i += 100) {
         const chunk = messages.slice(i, i + 100);
@@ -289,7 +308,7 @@ export const pushManager = {
             token: sub.fcmToken!,
             title: payload.title,
             body: payload.body,
-            data: { url: payload.url ?? "/" },
+            data: notifData,
           });
           if (result === "ok") {
             incrementDailyCount(sub.endpoint);

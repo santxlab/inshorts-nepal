@@ -38,8 +38,16 @@ export async function POST(req: NextRequest) {
         : (lang === "ne" ? "InShorts Nepal मा आजका ताजा समाचार पढ्नुहोस्।" : "Read today's fresh news on InShorts Nepal.");
 
       const result = await pushManager.sendToSubscribers(
-        { title, body, url: "/", tag: "morning-digest", icon: "/icons/icon-192.png" },
-        { filter: { language: lang === "ne" ? undefined : lang } }
+        {
+          title, body,
+          url: headline ? `/news/${headline.id}` : "/",
+          tag: "morning-digest",
+          icon: "/icons/icon-192.png",
+          articleId: headline?.id,
+          sourceUrl: headline?.sourceUrl,
+          language: lang,
+        },
+        { filter: { language: lang }, isBreaking: false }
       );
       return NextResponse.json({ success: true, type: "morning", ...result });
     }
@@ -55,8 +63,16 @@ export async function POST(req: NextRequest) {
         : (lang === "ne" ? "आजका महत्वपूर्ण घटनाहरू हेर्नुहोस्।" : "Catch up on today's important events.");
 
       const result = await pushManager.sendToSubscribers(
-        { title, body, url: "/", tag: "evening-brief", icon: "/icons/icon-192.png" },
-        { filter: { language: lang === "ne" ? undefined : lang } }
+        {
+          title, body,
+          url: headline ? `/news/${headline.id}` : "/",
+          tag: "evening-brief",
+          icon: "/icons/icon-192.png",
+          articleId: headline?.id,
+          sourceUrl: headline?.sourceUrl,
+          language: lang,
+        },
+        { filter: { language: lang } }
       );
       return NextResponse.json({ success: true, type: "evening", ...result });
     }
@@ -88,8 +104,11 @@ export async function POST(req: NextRequest) {
           url: `/news/${article.id}`,
           tag: `breaking-${article.id}`,
           icon: "/icons/icon-192.png",
+          articleId: article.id,
+          sourceUrl: article.sourceUrl,
+          language: lang,
         },
-        { filter: {} }
+        { filter: { language: lang }, isBreaking: true }
       );
       return NextResponse.json({ success: true, type: "breaking", article: article.id, ...result });
     }
