@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { NewsArticle, NewsSource, Category, Language } from "@/types";
 import { store } from "./store";
 import { detectTopics } from "./topics-config";
+import { detectCrossSourceBreaking } from "./breaking-detector";
 
 // Drop items older than this — keeps stale/mis-dated feed entries out of the feed.
 const MAX_AGE_DAYS = 21;
@@ -327,6 +328,18 @@ export async function fetchAllSources(
       }
     })
   );
+
+  // Wave 3: after every fetch run, scan the live article pool for cross-source
+  // breaking clusters and flag the freshest representative as isBreaking. The
+  // breaking-push cron + ranking both read this flag.
+  try {
+    const lang = language ?? undefined;
+    const pool = lang ? store.getArticles(lang) : store.getAllArticles();
+    const flagged = detectCrossSourceBreaking(pool);
+    if (flagged > 0) console.log(`[breaking-detector] flagged ${flagged} cross-source breaking stories`);
+  } catch (err) {
+    console.error("[breaking-detector] failed:", err);
+  }
 
   return { added: totalAdded, sources: fetchedSources };
 }
