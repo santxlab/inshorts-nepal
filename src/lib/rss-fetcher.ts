@@ -6,8 +6,8 @@ import { detectTopics } from "./topics-config";
 import { detectCrossSourceBreaking } from "./breaking-detector";
 import { translateBatch } from "./translation-service";
 import { isOpenAIConfigured } from "./openai-client";
-import { summarizeBatch } from "./summary-service";
-import { isDoAgentConfigured } from "./do-agent-client";
+// Summaries are generated on demand via /api/summary (not pre-fetched here), so
+// summary-service / do-agent-client are intentionally no longer imported.
 
 // Drop items older than this — keeps stale/mis-dated feed entries out of the feed.
 const MAX_AGE_DAYS = 21;
@@ -382,29 +382,13 @@ export async function fetchAllSources(
         })
         .catch((err) => console.error("[translation] batch failed:", err));
     }
-    if (isDoAgentConfigured()) {
-      // Summarize in FEED ORDER (publishedAt desc — the exact sort /api/feed
-      // uses) and cap per language. This guarantees the cards a user sees FIRST
-      // get their AI summary first, instead of the old getAllArticles() order
-      // (fetchedAt desc) which, since everything is fetched in one cycle, was
-      // effectively random vs the feed → top cards never got summarized. The
-      // cap also stops us burning tokens on the long tail nobody scrolls to;
-      // the shared cache means later cycles extend coverage as new stories land.
-      const SUMMARY_CAP = 120;
-      const ne = store.getArticles("ne").slice(0, SUMMARY_CAP);
-      const en = store.getArticles("en").slice(0, SUMMARY_CAP);
-      Promise.all([
-        summarizeBatch(ne, "ne", 2),
-        summarizeBatch(en, "en", 2),
-      ])
-        .then(([rn, re]) => {
-          const total = rn.succeeded + re.succeeded;
-          if (total > 0) {
-            console.log(`[summary] new: ne=${rn.succeeded} en=${re.succeeded} · cached: ne=${rn.cached} en=${re.cached}`);
-          }
-        })
-        .catch((err) => console.error("[summary] batch failed:", err));
-    }
+    // NOTE: AI summaries are intentionally NOT generated here anymore. They are
+    // produced ON DEMAND when a user taps the "सारांश" pill (see /api/summary),
+    // and shared via the MongoDB cache so the first tapper pays once and every
+    // reader after them gets it free. Pre-summarizing every article wasted
+    // tokens on stories nobody opened — and once summaries cost diamonds, work
+    // must only ever happen on an explicit user tap. (summarizeBatch is still
+    // exported for any future opt-in warming job.)
   });
 
   return { added: totalAdded, sources: fetchedSources };

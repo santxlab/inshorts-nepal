@@ -176,6 +176,11 @@ export default async function ArticlePage({ params }: Props) {
 
   return (
     <>
+      {/* globals.css locks `html, body { overflow: hidden }` for the home card
+          pager SPA — but this reader is a normal scrolling document. Re-enable
+          scrolling just for this route so the full story can be read (fixes the
+          "page won't scroll" bug in the in-app browser). */}
+      <style dangerouslySetInnerHTML={{ __html: "html,body{overflow:auto !important;height:auto !important;}" }} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
