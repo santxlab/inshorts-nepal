@@ -383,11 +383,16 @@ export async function fetchAllSources(
         .catch((err) => console.error("[translation] batch failed:", err));
     }
     if (isDoAgentConfigured()) {
-      const all = store.getAllArticles();
-      // Summarize in each language separately, prioritizing the article's own language
-      // first so the cheapest case (no translation needed) gets cached first.
-      const ne = all.filter((a) => a.language === "ne");
-      const en = all.filter((a) => a.language === "en");
+      // Summarize in FEED ORDER (publishedAt desc — the exact sort /api/feed
+      // uses) and cap per language. This guarantees the cards a user sees FIRST
+      // get their AI summary first, instead of the old getAllArticles() order
+      // (fetchedAt desc) which, since everything is fetched in one cycle, was
+      // effectively random vs the feed → top cards never got summarized. The
+      // cap also stops us burning tokens on the long tail nobody scrolls to;
+      // the shared cache means later cycles extend coverage as new stories land.
+      const SUMMARY_CAP = 120;
+      const ne = store.getArticles("ne").slice(0, SUMMARY_CAP);
+      const en = store.getArticles("en").slice(0, SUMMARY_CAP);
       Promise.all([
         summarizeBatch(ne, "ne", 2),
         summarizeBatch(en, "en", 2),
