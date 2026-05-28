@@ -4,6 +4,7 @@ import { store } from "@/lib/store";
 import { connectDB } from "@/lib/db";
 import { ArticleModel } from "@/models/ArticleModel";
 import { SummaryModel } from "@/models/SummaryModel";
+import { fetchFullArticle } from "@/lib/article-extractor";
 import { NewsArticle, Category } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inshortsnepal.org";
@@ -117,6 +118,33 @@ export default async function ArticlePage({ params }: Props) {
       if (s) aiSummary = s.summary;
     }
   } catch { /* non-fatal */ }
+
+  // Full article body. RSS only gives a short excerpt, so if we don't already
+  // have a decent `fullContent` we scrape the publisher page on demand and
+  // cache it (in-memory store object + MongoDB) so the next open is instant.
+  // Threshold sits above the RSS-derived stub size (~300–500 chars) so those
+  // stubs get upgraded to the real body, but comfortably below a genuine
+  // article so we don't needlessly re-scrape long pieces we already cached.
+  let fullContent = article.fullContent;
+  if (!fullContent || fullContent.length < 1000) {
+    const scraped = await fetchFullArticle(article.sourceUrl);
+    if (scraped && scraped.length > (fullContent?.length ?? 0)) {
+      fullContent = scraped;
+      // Mutating the looked-up object caches it in the in-memory store (when the
+      // hit came from there); the DB write covers the post-eviction path.
+      article.fullContent = scraped;
+      connectDB()
+        .then((conn) => {
+          if (conn) {
+            return ArticleModel.updateOne(
+              { articleId: id },
+              { $set: { fullContent: scraped } }
+            ).exec();
+          }
+        })
+        .catch(() => { /* best-effort cache */ });
+    }
+  }
 
   const canonical = `${BASE_URL}/news/${article.id}`;
 
@@ -233,8 +261,8 @@ export default async function ArticlePage({ params }: Props) {
 
           {/* Article body */}
           <div className="prose prose-invert prose-lg max-w-none">
-            {article.fullContent
-              ? article.fullContent.split("\n\n").map((para, i) => (
+            {fullContent
+              ? fullContent.split("\n\n").map((para, i) => (
                   <p key={i} className="text-white/85 text-lg leading-relaxed mb-4">
                     {para}
                   </p>
