@@ -39,9 +39,13 @@ export async function chat(
       body: JSON.stringify({
         // DO agents pick the model attached to them; the field is required but ignored.
         model: process.env.DO_AGENT_MODEL ?? "n/a",
+        // DO GenAI agents REJECT system/developer-role messages with HTTP 400
+        // ("agent instructions are set via agent configuration"). The agent's
+        // persona lives in its dashboard config, not the request. So we fold our
+        // task instructions into the single user turn — DeepSeek follows them
+        // exactly the same, and the call no longer 400s.
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "user", content: `${systemPrompt}\n\n========\n\n${userPrompt}` },
         ],
         temperature: opts.temperature ?? 0.3,
         max_tokens: opts.maxTokens ?? 400,
