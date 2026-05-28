@@ -1,4 +1,6 @@
 import { NewsArticle, NewsSource, Category, Language } from "@/types";
+import { connectDB } from "./db";
+import { ArticleModel } from "@/models/ArticleModel";
 
 // Seed data — always available on startup
 const SEED_ARTICLES: NewsArticle[] = [
@@ -675,6 +677,7 @@ export const store = {
     let added = 0;
     const seenIds = new Set(articles.map((a) => a.id));
     const seenTitles = new Set(articles.map((a) => a.title));
+    const trulyNew: NewsArticle[] = [];
     for (const article of newArticles) {
       // Dedup by stable id (re-fetch of same article) or exact title (same story
       // syndicated across sources). NOT by sourceUrl — that falls back to the
@@ -683,7 +686,47 @@ export const store = {
       articles.push(article);
       seenIds.add(article.id);
       seenTitles.add(article.title);
+      trulyNew.push(article);
       added++;
+    }
+    // Persist new articles to MongoDB (best-effort, non-blocking) so /news/<id>
+    // pages survive server restarts and the in-memory 500-cap. The unique
+    // articleId index makes re-fetches a no-op.
+    if (trulyNew.length > 0) {
+      connectDB().then((conn) => {
+        if (!conn) return;
+        ArticleModel.bulkWrite(
+          trulyNew.map((a) => ({
+            updateOne: {
+              filter: { articleId: a.id },
+              update: {
+                $setOnInsert: {
+                  articleId: a.id,
+                  title: a.title,
+                  summary: a.summary,
+                  fullContent: a.fullContent,
+                  imageUrl: a.imageUrl,
+                  sourceUrl: a.sourceUrl,
+                  sourceName: a.sourceName,
+                  category: a.category,
+                  topics: a.topics ?? [],
+                  language: a.language,
+                  origin: a.origin,
+                  sourceQuality: a.sourceQuality,
+                  publishedAt: new Date(a.publishedAt),
+                  fetchedAt: new Date(a.fetchedAt),
+                  isApproved: a.isApproved,
+                  isBreaking: a.isBreaking ?? false,
+                  readTimeSeconds: a.readTimeSeconds,
+                  viewCount: a.viewCount,
+                },
+              },
+              upsert: true,
+            },
+          })),
+          { ordered: false }
+        ).catch((err) => console.error("[store] persist failed:", err));
+      });
     }
     // Keep max 500 articles
     if (articles.length > 500) {

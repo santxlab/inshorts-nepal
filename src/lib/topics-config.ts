@@ -18,7 +18,7 @@ export const TOPICS: TopicConfig[] = [
   { id: "startups",     label: "Startups",         labelNe: "स्टार्टअप",          emoji: "🚀", color: "#8B5CF6", bgColor: "bg-violet-500",  keywords: ["startup","entrepreneur","funding","venture","investment","innovation"] },
   { id: "tech",         label: "Technology",       labelNe: "प्रविधि",            emoji: "💻", color: "#06B6D4", bgColor: "bg-cyan-500",    keywords: ["tech","technology","digital","software","ai","internet","app","प्रविधि"] },
   { id: "sports",       label: "Sports",           labelNe: "खेलकुद",             emoji: "🏆", color: "#F97316", bgColor: "bg-orange-500",  keywords: ["sports","game","player","match","tournament","खेल"] },
-  { id: "cricket",      label: "Cricket",          labelNe: "क्रिकेट",            emoji: "🏏", color: "#84CC16", bgColor: "bg-lime-500",    keywords: ["cricket","wicket","batting","bowling","icc","test","odi","क्रिकेट"] },
+  { id: "cricket",      label: "Cricket",          labelNe: "क्रिकेट",            emoji: "🏏", color: "#84CC16", bgColor: "bg-lime-500",    keywords: ["cricket","wicket","batting","bowling","icc","test match","test series","test cricket","odi","t20","क्रिकेट"] },
   { id: "football",     label: "Football",         labelNe: "फुटबल",              emoji: "⚽", color: "#22C55E", bgColor: "bg-green-500",   keywords: ["football","soccer","fifa","goal","league","फुटबल"] },
   { id: "entertainment",label: "Entertainment",    labelNe: "मनोरञ्जन",          emoji: "🎬", color: "#EC4899", bgColor: "bg-pink-500",    keywords: ["entertainment","celebrity","award","music","मनोरञ्जन"] },
   { id: "bollywood",    label: "Bollywood",        labelNe: "बलिउड",              emoji: "🎭", color: "#A855F7", bgColor: "bg-purple-500",  keywords: ["bollywood","hindi film","actor","actress","box office","बलिउड"] },
@@ -39,13 +39,28 @@ export function getTopicById(id: TopicId): TopicConfig | undefined {
   return TOPICS.find((t) => t.id === id);
 }
 
+function escRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function detectTopics(text: string): TopicId[] {
   const lower = text.toLowerCase();
   const matched: TopicId[] = [];
   for (const topic of TOPICS) {
-    if (topic.keywords.some((k) => lower.includes(k))) {
-      matched.push(topic.id);
-    }
+    const hit = topic.keywords.some((k) => {
+      // Multi-word phrase (e.g. "test match"): substring match is precise enough.
+      if (k.includes(" ")) return lower.includes(k);
+      // ASCII single word: require whole-word match so "odi" never hits "modi",
+      // "test" never hits "fastest", "ai" never hits "wait", etc.
+      if (/^[a-z0-9]+$/i.test(k)) {
+        const re = new RegExp("\\b" + escRegex(k) + "\\b", "i");
+        return re.test(lower);
+      }
+      // Non-ASCII (Devanagari): substring match — Devanagari keywords here are
+      // long enough that the false-positive risk is negligible.
+      return lower.includes(k);
+    });
+    if (hit) matched.push(topic.id);
   }
   // No forced default: returning [] avoids mislabeling foreign/uncategorized
   // news as "local" (which was tagging e.g. international entertainment wrongly).

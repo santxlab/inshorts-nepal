@@ -1,9 +1,54 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { store } from "@/lib/store";
-import { NewsArticle } from "@/types";
+import { connectDB } from "@/lib/db";
+import { ArticleModel } from "@/models/ArticleModel";
+import { NewsArticle, Category } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inshortsnepal.org";
+
+// Look up an article first in the in-memory store (fast path), then fall back
+// to the persistent MongoDB copy so the page works across restarts + after the
+// in-memory cap has evicted the entry.
+async function lookupArticle(id: string): Promise<NewsArticle | null> {
+  const inMem = store.getAllArticles().find((a) => a.id === id);
+  if (inMem) return inMem;
+  const conn = await connectDB();
+  if (!conn) return null;
+  try {
+    const doc = await ArticleModel.findOne({ articleId: id }).lean<{
+      articleId: string; title: string; summary: string; fullContent?: string;
+      imageUrl?: string; sourceUrl: string; sourceName: string; category: string;
+      topics?: string[]; language: "ne" | "en"; origin?: "np" | "in" | "global";
+      sourceQuality?: number; publishedAt: Date; fetchedAt: Date;
+      isApproved: boolean; isBreaking?: boolean; readTimeSeconds?: number; viewCount?: number;
+    }>();
+    if (!doc) return null;
+    return {
+      id: doc.articleId,
+      title: doc.title,
+      summary: doc.summary,
+      fullContent: doc.fullContent,
+      imageUrl: doc.imageUrl,
+      sourceUrl: doc.sourceUrl,
+      sourceName: doc.sourceName,
+      category: doc.category as Category,
+      topics: doc.topics as NewsArticle["topics"],
+      language: doc.language,
+      origin: doc.origin,
+      sourceQuality: doc.sourceQuality,
+      publishedAt: doc.publishedAt.toISOString(),
+      fetchedAt: doc.fetchedAt.toISOString(),
+      isApproved: doc.isApproved,
+      isBreaking: doc.isBreaking,
+      readTimeSeconds: doc.readTimeSeconds,
+      viewCount: doc.viewCount,
+    };
+  } catch (err) {
+    console.error("[news/[id]] mongo fallback failed:", err);
+    return null;
+  }
+}
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -11,7 +56,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const article = store.getAllArticles().find((a) => a.id === id);
+  const article = await lookupArticle(id);
   if (!article) return { title: "Article not found" };
 
   const description = article.summary.slice(0, 160);
@@ -57,7 +102,7 @@ function timeAgo(iso: string): string {
 
 export default async function ArticlePage({ params }: Props) {
   const { id } = await params;
-  const article: NewsArticle | undefined = store.getAllArticles().find((a) => a.id === id);
+  const article = await lookupArticle(id);
   if (!article) notFound();
 
   const canonical = `${BASE_URL}/news/${article.id}`;
