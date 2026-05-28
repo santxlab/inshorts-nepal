@@ -1,80 +1,117 @@
-// Phase 2.2 — Short-form Inshorts-style summaries (55–65 words) via the
-// DigitalOcean Agent (DeepSeek V3.2). One summary per (articleId, lang),
-// cached in MongoDB and shared across all users → first user pays the cost,
-// everyone else reads it free.
+// Phase 2.2 — Short-form Inshorts-style summaries via the DigitalOcean Agent
+// (DeepSeek V3.2). One summary per (articleId, lang, mode), cached in MongoDB
+// and shared across all users → first user pays the cost, everyone else reads
+// it free.
+//   mode "short" → 30–40 words (in-app news card)
+//   mode "long"  → 60–70 words (full story reader)
 import type { NewsArticle } from "@/types";
 import { chat, isDoAgentConfigured } from "./do-agent-client";
 import { connectDB } from "./db";
-import { SummaryModel } from "@/models/SummaryModel";
-
-const SYSTEM_PROMPT = `You are a news-summarizer for InShorts Nepal, a Nepali news app
-that delivers short, neutral summaries in Nepali and English.
-
-TASK: produce a tight 55-65 word summary of the article in TARGET_LANGUAGE.
-- Lead with the most important fact (who, what, when, where).
-- Then add brief context.
-- Preserve all proper nouns, numbers, dates, currencies, places exactly.
-- Neutral, journalistic tone. No opinion, no emotive adjectives.
-- Self-contained — readable on its own without the source.
-
-NEPALI (ne): natural Nepali at the level of Kantipur / Setopati / Online Khabar.
-Devanagari only. End sentences with "।". No Hindi vocabulary, no Hindi script.
-
-ENGLISH (en): clear, neutral journalistic English. No clickbait.
-
-INPUT FORMAT (plain text):
-TASK: summarize
-TARGET_LANGUAGE: <ne | en>
-TITLE: <article title>
-BODY: <article body>
-
-OUTPUT FORMAT:
-Return ONLY the summary paragraph. No preface, no "Summary:" label, no markdown.
-
-HARD RULES:
-- Never invent facts, names, or numbers.
-- Never include greetings, sign-offs, or "Here is..." prefixes.
-- If input is empty or nonsensical, return exactly: ERROR
-`;
+import { SummaryModel, type SummaryMode } from "@/models/SummaryModel";
 
 export type Lang = "ne" | "en";
 
-function buildPrompt(article: NewsArticle, lang: Lang): string {
-  return `TASK: summarize
-TARGET_LANGUAGE: ${lang}
+const WORDS: Record<SummaryMode, string> = {
+  short: "30 to 40",
+  long: "60 to 70",
+};
+
+function systemPrompt(lang: Lang, mode: SummaryMode): string {
+  // The language rule is stated forcefully and first because the model has been
+  // observed ignoring a softer "in TARGET_LANGUAGE" instruction and replying in
+  // English for Nepali articles. summarizeArticle() additionally GUARDS the
+  // output and refuses to cache a wrong-language result.
+  const langRule =
+    lang === "ne"
+      ? `OUTPUT LANGUAGE: नेपाली (Nepali) in DEVANAGARI SCRIPT ONLY.
+- Write EVERY sentence in Nepali. Do NOT reply in English.
+- No Latin letters except unavoidable proper nouns/acronyms.
+- No Hindi vocabulary or Hindi grammar. End each sentence with "।".`
+      : `OUTPUT LANGUAGE: English ONLY.
+- Write the entire summary in clear, neutral English. Do NOT reply in Nepali/Devanagari.`;
+
+  return `You are a news summarizer for InShorts Nepal.
+
+${langRule}
+
+LENGTH: ${WORDS[mode]} words. Stay within this range.
+
+STYLE:
+- Lead with the most important fact (who, what, when, where), then brief context.
+- Preserve all proper nouns, numbers, dates, currencies, and places exactly.
+- Neutral, journalistic tone. No opinion, no emotive adjectives.
+- Self-contained — readable on its own without the source.
+
+OUTPUT: Return ONLY the summary paragraph. No preface, no "Summary:" label, no
+markdown, no greetings. If the input is empty or nonsensical, return exactly: ERROR`;
+}
+
+function buildPrompt(article: NewsArticle, lang: Lang, mode: SummaryMode): string {
+  return `TARGET_LANGUAGE: ${lang}
+LENGTH: ${WORDS[mode]} words
 TITLE: ${article.title}
 BODY: ${article.summary}`;
 }
 
+// Devanagari unicode block.
+const DEVANAGARI = /[ऀ-ॿ]/;
+
+function devanagariRatio(s: string): number {
+  const dev = (s.match(/[ऀ-ॿ]/g) || []).length;
+  const letters = (s.match(/[ऀ-ॿ\p{L}]/gu) || []).length || 1;
+  return dev / letters;
+}
+
+// Reject output that came back in the wrong language (the model occasionally
+// ignores the instruction). ne must be mostly Devanagari; en must be mostly not.
+function isRightLanguage(summary: string, lang: Lang): boolean {
+  if (lang === "ne") return DEVANAGARI.test(summary) && devanagariRatio(summary) > 0.5;
+  return devanagariRatio(summary) < 0.2;
+}
+
 /** Returns a cached summary or generates+caches a new one. Returns null on failure. */
-export async function summarizeArticle(article: NewsArticle, lang: Lang): Promise<string | null> {
+export async function summarizeArticle(
+  article: NewsArticle,
+  lang: Lang,
+  mode: SummaryMode = "long"
+): Promise<string | null> {
   if (!isDoAgentConfigured()) return null;
   const dbOk = (await connectDB()) !== null;
 
   // Cache lookup
   if (dbOk) {
     try {
-      const cached = await SummaryModel.findOne({
-        articleId: article.id,
-        lang,
-      }).lean<{ summary: string }>();
+      const cached = await SummaryModel.findOne({ articleId: article.id, lang, mode })
+        .lean<{ summary: string }>();
       if (cached) return cached.summary;
     } catch (err) {
       console.error("[summary] cache read failed:", err);
     }
   }
 
-  // Generate
-  const result = await chat(SYSTEM_PROMPT, buildPrompt(article, lang));
-  if (!result || result.content.trim() === "ERROR") return null;
-  const summary = result.content.trim();
+  // Generate (with one retry if the model replies in the wrong language).
+  let summary: string | null = null;
+  for (let attempt = 0; attempt < 2 && !summary; attempt++) {
+    const sys = attempt === 0
+      ? systemPrompt(lang, mode)
+      : systemPrompt(lang, mode) +
+        (lang === "ne"
+          ? `\n\nREMINDER: तपाईंको जवाफ पूर्ण रूपमा नेपाली (देवनागरी) मा मात्र हुनुपर्छ।`
+          : `\n\nREMINDER: Your entire answer MUST be in English.`);
+    const result = await chat(sys, buildPrompt(article, lang, mode));
+    if (!result) break;
+    const text = result.content.trim();
+    if (text === "ERROR" || !text) break;
+    if (isRightLanguage(text, lang)) summary = text;
+  }
+  if (!summary) return null;
 
   // Cache (best-effort)
   if (dbOk) {
     try {
       await SummaryModel.findOneAndUpdate(
-        { articleId: article.id, lang },
-        { articleId: article.id, lang, summary, modelName: process.env.DO_AGENT_MODEL ?? "deepseek-v3.2" },
+        { articleId: article.id, lang, mode },
+        { articleId: article.id, lang, mode, summary, modelName: process.env.DO_AGENT_MODEL ?? "deepseek-v3.2" },
         { upsert: true, new: true }
       );
     } catch (err) {
@@ -85,58 +122,18 @@ export async function summarizeArticle(article: NewsArticle, lang: Lang): Promis
   return summary;
 }
 
-/**
- * Batch-summarize: only articles without a cached summary actually call the agent.
- * Same parallel-chunked pattern as the translation service.
- */
-export async function summarizeBatch(
-  articles: NewsArticle[],
-  lang: Lang,
-  concurrency = 2
-): Promise<{ attempted: number; succeeded: number; cached: number }> {
-  if (!isDoAgentConfigured()) return { attempted: 0, succeeded: 0, cached: 0 };
-
-  let cached = 0;
-  let remaining = articles;
-  const dbOk = (await connectDB()) !== null;
-
-  if (dbOk) {
-    try {
-      const docs = await SummaryModel.find({
-        articleId: { $in: articles.map((a) => a.id) },
-        lang,
-      })
-        .select({ articleId: 1, _id: 0 })
-        .lean<{ articleId: string }[]>();
-      const cachedIds = new Set(docs.map((d) => d.articleId));
-      remaining = articles.filter((a) => !cachedIds.has(a.id));
-      cached = articles.length - remaining.length;
-    } catch (err) {
-      console.error("[summary] bulk cache read failed:", err);
-    }
-  }
-
-  let succeeded = 0;
-  for (let i = 0; i < remaining.length; i += concurrency) {
-    const chunk = remaining.slice(i, i + concurrency);
-    const results = await Promise.allSettled(chunk.map((a) => summarizeArticle(a, lang)));
-    for (const r of results) if (r.status === "fulfilled" && r.value) succeeded++;
-  }
-
-  return { attempted: articles.length, succeeded, cached };
-}
-
 /** Bulk-fetch cached summaries for many articles — used by /api/feed. */
 export async function getCachedSummaries(
   articleIds: string[],
-  lang: Lang
+  lang: Lang,
+  mode: SummaryMode = "short"
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (articleIds.length === 0) return out;
   const dbOk = (await connectDB()) !== null;
   if (!dbOk) return out;
   try {
-    const docs = await SummaryModel.find({ articleId: { $in: articleIds }, lang })
+    const docs = await SummaryModel.find({ articleId: { $in: articleIds }, lang, mode })
       .select({ articleId: 1, summary: 1, _id: 0 })
       .lean<{ articleId: string; summary: string }[]>();
     for (const d of docs) out.set(d.articleId, d.summary);

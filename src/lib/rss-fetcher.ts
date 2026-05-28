@@ -387,8 +387,7 @@ export async function fetchAllSources(
     // and shared via the MongoDB cache so the first tapper pays once and every
     // reader after them gets it free. Pre-summarizing every article wasted
     // tokens on stories nobody opened — and once summaries cost diamonds, work
-    // must only ever happen on an explicit user tap. (summarizeBatch is still
-    // exported for any future opt-in warming job.)
+    // must only ever happen on an explicit user tap.
   });
 
   return { added: totalAdded, sources: fetchedSources };

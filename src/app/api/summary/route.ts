@@ -17,6 +17,7 @@ import { connectDB } from "@/lib/db";
 import { ArticleModel } from "@/models/ArticleModel";
 import { SummaryModel } from "@/models/SummaryModel";
 import { summarizeArticle } from "@/lib/summary-service";
+import type { SummaryMode } from "@/models/SummaryModel";
 import { isDoAgentConfigured } from "@/lib/do-agent-client";
 import type { NewsArticle, Category } from "@/types";
 
@@ -52,6 +53,9 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const articleId = searchParams.get("articleId") || searchParams.get("id");
   const lang = (searchParams.get("lang") || "ne") as "ne" | "en";
+  // Length: "short" (30–40 words) for the in-app card pill, "long" (60–70) for
+  // the full-story reader. Defaults to short — the card is the common caller.
+  const mode: SummaryMode = searchParams.get("mode") === "long" ? "long" : "short";
 
   if (!articleId) {
     return NextResponse.json({ error: "articleId required" }, { status: 400 });
@@ -62,7 +66,7 @@ export async function GET(req: NextRequest) {
   try {
     const conn = await connectDB();
     if (conn) {
-      const cached = await SummaryModel.findOne({ articleId, lang })
+      const cached = await SummaryModel.findOne({ articleId, lang, mode })
         .select({ summary: 1, _id: 0 })
         .lean<{ summary: string }>();
       if (cached?.summary) {
@@ -84,7 +88,7 @@ export async function GET(req: NextRequest) {
   }
 
   // summarizeArticle re-checks the cache then generates + persists on a miss.
-  const summary = await summarizeArticle(article, lang);
+  const summary = await summarizeArticle(article, lang, mode);
   if (!summary) {
     return NextResponse.json(
       { error: "summarization failed", summary: null },

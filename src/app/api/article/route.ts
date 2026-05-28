@@ -52,11 +52,13 @@ export async function GET(req: NextRequest) {
   const article = await lookupArticle(id);
   if (!article) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  // Attach an already-cached summary (read-only — never generates here).
+  // Attach an already-cached SHORT (card-length) summary, read-only — never
+  // generates here. The card pill uses the short form; the modal will fetch
+  // on demand if this isn't cached yet.
   try {
     const conn = await connectDB();
     if (conn) {
-      const s = await SummaryModel.findOne({ articleId: id, lang })
+      const s = await SummaryModel.findOne({ articleId: id, lang, mode: "short" })
         .select({ summary: 1, _id: 0 })
         .lean<{ summary: string }>();
       if (s?.summary) (article as NewsArticle).aiSummary = s.summary;

@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/db";
 import { ArticleModel } from "@/models/ArticleModel";
 import { SummaryModel } from "@/models/SummaryModel";
 import { fetchFullArticle } from "@/lib/article-extractor";
+import { summarizeArticle } from "@/lib/summary-service";
 import { NewsArticle, Category } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inshortsnepal.org";
@@ -54,6 +55,7 @@ async function lookupArticle(id: string): Promise<NewsArticle | null> {
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -102,20 +104,31 @@ function timeAgo(iso: string): string {
   return `${Math.floor(diff / 86400)} days ago`;
 }
 
-export default async function ArticlePage({ params }: Props) {
+export default async function ArticlePage({ params, searchParams }: Props) {
   const { id } = await params;
+  const sp = searchParams ? await searchParams : {};
+  // Real in-app readers arrive with ?app=1 (added by the mobile openArticle()).
+  // We only GENERATE the long summary for them — the public page is SEO-crawled,
+  // and letting bots trigger generation would explode token/diamond cost.
+  const fromApp = sp.app === "1";
   const article = await lookupArticle(id);
   if (!article) notFound();
 
-  // Pull the cached AI summary (DeepSeek) for this article in its language.
+  // Long (60–70 word) AI summary for the full story. Cache-first + shared. For
+  // app readers we generate on a miss (reaching this page is a deliberate "read
+  // full" tap); for everyone else we only show it if already cached.
   let aiSummary: string | null = null;
   try {
-    const conn = await connectDB();
-    if (conn) {
-      const s = await SummaryModel.findOne({ articleId: id, lang: article.language })
-        .select({ summary: 1, _id: 0 })
-        .lean<{ summary: string }>();
-      if (s) aiSummary = s.summary;
+    if (fromApp) {
+      aiSummary = await summarizeArticle(article, article.language, "long");
+    } else {
+      const conn = await connectDB();
+      if (conn) {
+        const s = await SummaryModel.findOne({ articleId: id, lang: article.language, mode: "long" })
+          .select({ summary: 1, _id: 0 })
+          .lean<{ summary: string }>();
+        if (s) aiSummary = s.summary;
+      }
     }
   } catch { /* non-fatal */ }
 
