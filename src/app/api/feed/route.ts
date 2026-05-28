@@ -99,9 +99,10 @@ export async function GET(req: NextRequest) {
   const start = (page - 1) * limit;
   let items = ranked.slice(start, start + limit);
 
-  // ── 5. Phase 2.2: swap RSS summaries for the cached inshorts-style AI
-  // summary (DeepSeek via DO Agent) when available. Cache-only — no LLM calls
-  // on the request path.
+  // ── 5. Phase 2.2: ATTACH the cached AI summary as a separate `aiSummary`
+  // field (do NOT replace the original `summary` — the card still shows the
+  // RSS excerpt; the user opens the Saransh button to see the AI version).
+  // Cache-only — no LLM calls on the request path.
   const summaryMap = await getCachedSummaries(items.map((a) => a.id), lang);
   let summarizedCount = 0;
   if (summaryMap.size > 0) {
@@ -109,7 +110,7 @@ export async function GET(req: NextRequest) {
       const s = summaryMap.get(a.id);
       if (s) {
         summarizedCount++;
-        return { ...a, summary: s };
+        return { ...a, aiSummary: s };
       }
       return a;
     });

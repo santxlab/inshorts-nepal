@@ -141,6 +141,22 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+/**
+ * Like stripHtml but preserves paragraph structure — block-level tags become
+ * `\n\n` so /news/<id> can render real paragraphs. Used for `fullContent`.
+ */
+function extractFullContent(html: string): string {
+  if (!html) return "";
+  const withBreaks = html
+    .replace(/<\/?(p|br|div|h[1-6]|li|tr)[^>]*>/gi, "\n")
+    .replace(/<[^>]*>/g, " ");
+  return fixMojibake(decodeEntities(withBreaks))
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter((line) => line.length > 0)
+    .join("\n\n");
+}
+
 type MediaNode = { $?: { url?: string; medium?: string; type?: string } } | undefined;
 
 // Parser item enriched with the custom fields we registered above.
@@ -250,6 +266,11 @@ export async function fetchFromSource(
         "";
 
       const cleanSummary = stripHtml(rawSummary).slice(0, 300);
+      // Paragraph-preserving full body for the /news/<id> reader page. Only
+      // set if it's meaningfully longer than the 300-char summary — otherwise
+      // the RSS was just a teaser and there's nothing new to show.
+      const cleanFull = extractFullContent(rawSummary);
+      const fullContent = cleanFull.length > cleanSummary.length + 50 ? cleanFull : undefined;
       const title = stripHtml(item.title);
       if (!title) continue;
 
@@ -278,6 +299,7 @@ export async function fetchFromSource(
         id: makeArticleId(source.id, item.link || item.guid || title),
         title,
         summary: cleanSummary || title,
+        ...(fullContent ? { fullContent } : {}),
         imageUrl: image,
         sourceUrl: item.link || source.url,
         sourceName: source.name,

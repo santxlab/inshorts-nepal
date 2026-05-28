@@ -121,6 +121,10 @@ export interface NewsArticle {
   // Wave 1: content origin and source quality for language-aware mixing + clustering.
   origin?: "np" | "in" | "global"; // where the content focus is — defaults to "np" if absent
   sourceQuality?: number;          // 1–10 trust/quality weight (used in clustering tie-break)
+  // Phase 2.2: AI-generated 55–65 word summary (DeepSeek). Attached by
+  // /api/feed when available — shown ON DEMAND via a Saransh button so the
+  // card itself keeps showing the original RSS summary.
+  aiSummary?: string;
 }
 
 export interface NewsSource {

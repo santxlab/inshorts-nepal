@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { store } from "@/lib/store";
 import { connectDB } from "@/lib/db";
 import { ArticleModel } from "@/models/ArticleModel";
+import { SummaryModel } from "@/models/SummaryModel";
 import { NewsArticle, Category } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inshortsnepal.org";
@@ -105,6 +106,18 @@ export default async function ArticlePage({ params }: Props) {
   const article = await lookupArticle(id);
   if (!article) notFound();
 
+  // Pull the cached AI summary (DeepSeek) for this article in its language.
+  let aiSummary: string | null = null;
+  try {
+    const conn = await connectDB();
+    if (conn) {
+      const s = await SummaryModel.findOne({ articleId: id, lang: article.language })
+        .select({ summary: 1, _id: 0 })
+        .lean<{ summary: string }>();
+      if (s) aiSummary = s.summary;
+    }
+  } catch { /* non-fatal */ }
+
   const canonical = `${BASE_URL}/news/${article.id}`;
 
   // JSON-LD structured data for Google News
@@ -205,12 +218,30 @@ export default async function ArticlePage({ params }: Props) {
             </figure>
           )}
 
-          {/* Content */}
+          {/* AI Summary (Saransh) — shown above the article body when available */}
+          {aiSummary && (
+            <div className="mb-6 p-4 rounded-2xl bg-red-600/10 border border-red-600/30">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">✨</span>
+                <span className="text-red-400 text-xs font-bold uppercase tracking-wider">
+                  {article.language === "ne" ? "सारांश" : "Summary"}
+                </span>
+              </div>
+              <p className="text-white text-base leading-relaxed">{aiSummary}</p>
+            </div>
+          )}
+
+          {/* Article body */}
           <div className="prose prose-invert prose-lg max-w-none">
-            <p className="text-white/85 text-lg leading-relaxed mb-4">{article.summary}</p>
-            {article.fullContent && (
-              <p className="text-white/70 text-base leading-relaxed">{article.fullContent}</p>
-            )}
+            {article.fullContent
+              ? article.fullContent.split("\n\n").map((para, i) => (
+                  <p key={i} className="text-white/85 text-lg leading-relaxed mb-4">
+                    {para}
+                  </p>
+                ))
+              : (
+                <p className="text-white/85 text-lg leading-relaxed mb-4">{article.summary}</p>
+              )}
           </div>
 
           {/* Topics */}
