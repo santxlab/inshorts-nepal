@@ -47,10 +47,17 @@ markdown, no greetings. If the input is empty or nonsensical, return exactly: ER
 }
 
 function buildPrompt(article: NewsArticle, lang: Lang, mode: SummaryMode): string {
+  // Prefer the full scraped body when we have it (the reader page resolves it
+  // before requesting a long summary) — the RSS stub alone is too thin for the
+  // model to write 60–70 substantive words. Cap to keep the prompt economical.
+  const raw = article.fullContent && article.fullContent.length > article.summary.length
+    ? article.fullContent
+    : article.summary;
+  const body = raw.length > 4000 ? raw.slice(0, 4000) : raw;
   return `TARGET_LANGUAGE: ${lang}
 LENGTH: ${WORDS[mode]} words
 TITLE: ${article.title}
-BODY: ${article.summary}`;
+BODY: ${body}`;
 }
 
 // Devanagari unicode block.

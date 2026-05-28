@@ -114,30 +114,13 @@ export default async function ArticlePage({ params, searchParams }: Props) {
   const article = await lookupArticle(id);
   if (!article) notFound();
 
-  // Long (60–70 word) AI summary for the full story. Cache-first + shared. For
-  // app readers we generate on a miss (reaching this page is a deliberate "read
-  // full" tap); for everyone else we only show it if already cached.
-  let aiSummary: string | null = null;
-  try {
-    if (fromApp) {
-      aiSummary = await summarizeArticle(article, article.language, "long");
-    } else {
-      const conn = await connectDB();
-      if (conn) {
-        const s = await SummaryModel.findOne({ articleId: id, lang: article.language, mode: "long" })
-          .select({ summary: 1, _id: 0 })
-          .lean<{ summary: string }>();
-        if (s) aiSummary = s.summary;
-      }
-    }
-  } catch { /* non-fatal */ }
-
-  // Full article body. RSS only gives a short excerpt, so if we don't already
-  // have a decent `fullContent` we scrape the publisher page on demand and
-  // cache it (in-memory store object + MongoDB) so the next open is instant.
-  // Threshold sits above the RSS-derived stub size (~300–500 chars) so those
-  // stubs get upgraded to the real body, but comfortably below a genuine
-  // article so we don't needlessly re-scrape long pieces we already cached.
+  // Full article body FIRST. RSS only gives a short excerpt, so if we don't
+  // already have a decent `fullContent` we scrape the publisher page on demand
+  // and cache it (in-memory store object + MongoDB) so the next open is instant.
+  // Resolving it before the summary means the long summary is built from the
+  // real article text, not the stub — so it can actually reach 60–70 words.
+  // Threshold sits above the RSS stub size (~300–500 chars) so stubs get
+  // upgraded, but below a genuine article so we don't re-scrape long pieces.
   let fullContent = article.fullContent;
   if (!fullContent || fullContent.length < 1000) {
     const scraped = await fetchFullArticle(article.sourceUrl);
@@ -158,6 +141,25 @@ export default async function ArticlePage({ params, searchParams }: Props) {
         .catch(() => { /* best-effort cache */ });
     }
   }
+
+  // Long (60–70 word) AI summary for the full story, built from the full article
+  // text resolved above. Cache-first + shared. For app readers we generate on a
+  // miss (reaching this page is a deliberate "read full" tap); for everyone else
+  // (incl. SEO crawlers) we only show it if already cached.
+  let aiSummary: string | null = null;
+  try {
+    if (fromApp) {
+      aiSummary = await summarizeArticle(article, article.language, "long");
+    } else {
+      const conn = await connectDB();
+      if (conn) {
+        const s = await SummaryModel.findOne({ articleId: id, lang: article.language, mode: "long" })
+          .select({ summary: 1, _id: 0 })
+          .lean<{ summary: string }>();
+        if (s) aiSummary = s.summary;
+      }
+    }
+  } catch { /* non-fatal */ }
 
   const canonical = `${BASE_URL}/news/${article.id}`;
 
