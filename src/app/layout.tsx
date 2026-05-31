@@ -3,6 +3,7 @@ import "./globals.css";
 import { UserPrefsProvider } from "@/contexts/UserPrefsContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { GamificationProvider } from "@/contexts/GamificationContext";
+import AuthModalWrapper from "@/components/auth/AuthModalWrapper";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://www.inshortsnepal.org";
 
@@ -80,6 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <UserPrefsProvider>
             <GamificationProvider>
               {children}
+              <AuthModalWrapper />
             </GamificationProvider>
           </UserPrefsProvider>
         </AuthProvider>

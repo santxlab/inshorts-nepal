@@ -23,6 +23,7 @@
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "firebase": "^12.14.0",
     "framer-motion": "^11.18.2",
     "google-auth-library": "^9.15.1",
     "jsonwebtoken": "^9.0.2",
@@ -31,6 +32,7 @@
     "next": "^16.2.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "resend": "^6.12.4",
     "rss-parser": "^3.13.0",
     "web-push": "^3.6.7"
   },

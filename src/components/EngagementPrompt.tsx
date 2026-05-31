@@ -108,7 +108,7 @@ const PROMPTS: Record<PromptId, PromptConfig> = {
 };
 
 export default function EngagementPrompt() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, openAuth } = useAuth();
   const { prefs } = useUserPrefs();
   const [promptId, setPromptId] = useState<PromptId | null>(null);
   const [visible, setVisible] = useState(false);
@@ -152,6 +152,12 @@ export default function EngagementPrompt() {
         setNotifLoading(false);
       }
       dismiss();
+      return;
+    }
+
+    if (cfg.action === "signup" || cfg.action === "signin") {
+      dismiss();
+      openAuth();
       return;
     }
 
