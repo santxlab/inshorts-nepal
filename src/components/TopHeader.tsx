@@ -4,6 +4,7 @@ import { useUserPrefs } from "@/contexts/UserPrefsContext";
 import { LANGUAGE_CONFIG, Language, TopicId, SUPPORTED_LANGUAGES } from "@/types";
 import { TOPICS } from "@/lib/topics-config";
 import StreakWidget from "./StreakWidget";
+import DiamondBalance from "./DiamondBalance";
 
 interface Props {
   activeTopics: TopicId[];
@@ -31,7 +32,10 @@ export default function TopHeader({ onTopicFilter, selectedTopic }: Props) {
           </div>
         </div>
 
-        <StreakWidget />
+        <div className="flex items-center gap-2">
+          <DiamondBalance />
+          <StreakWidget />
+        </div>
 
         {/* Language toggle */}
         <button

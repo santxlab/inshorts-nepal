@@ -7,6 +7,8 @@ import { getTopicById } from "@/lib/topics-config";
 import { createSignal, recordSignal, loadBehaviorProfile, saveBehaviorProfile } from "@/lib/behavior";
 import { getFallbackImage } from "@/lib/image-fallbacks";
 import { recordBookmark, recordShare as recordEngShare } from "@/lib/engagement";
+import SummaryDiamondModal from "@/components/SummaryDiamondModal";
+import { earnDiamonds } from "@/lib/diamonds-client";
 
 interface Props {
   article: NewsArticle;
@@ -34,6 +36,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
   const [showDetail, setShowDetail] = useState(false);
   const [showWebView, setShowWebView] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   // Canonical share URL — always links to our app
   const appUrl = typeof window !== "undefined"
@@ -83,7 +86,7 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
       const readTimeMs = (article.readTimeSeconds ?? 60) * 1000;
       const readPercent = Math.min(100, Math.round((timeSpentMs / readTimeMs) * 100));
       const skipped = timeSpentMs < 3000 && readPercent < 20;
-      if (timeSpentMs > 5000) onArticleRead();
+      if (timeSpentMs > 5000) { onArticleRead(); earnDiamonds("article_read"); }
       try {
         const profile = loadBehaviorProfile();
         const signal = createSignal(article.id, article.topics ?? [], article.language, {
@@ -293,15 +296,25 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
           <span className="text-[#999] text-[12px]">
             {timeAgo(article.publishedAt, isNepali)}
           </span>
-          <button
-            onClick={handleAudio}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all active:scale-95 ${
-              isPlaying ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            <span>{isPlaying ? "⏹" : "🎧"}</span>
-            <span>{isNepali ? (isPlaying ? "रोक्नु" : "सुन्नु") : (isPlaying ? "Stop" : "Listen")}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* AI Summary (✨ सारांश) — costs 5💎, generated on demand & shared */}
+            <button
+              onClick={() => setShowSummary(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold bg-red-50 text-[#e63946] transition-all active:scale-95"
+            >
+              <span>✨</span>
+              <span>{isNepali ? "सारांश" : "Summary"}</span>
+            </button>
+            <button
+              onClick={handleAudio}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all active:scale-95 ${
+                isPlaying ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              <span>{isPlaying ? "⏹" : "🎧"}</span>
+              <span>{isNepali ? (isPlaying ? "रोक्नु" : "सुन्नु") : (isPlaying ? "Stop" : "Listen")}</span>
+            </button>
+          </div>
         </div>
 
         {/* Bottom strip — "Read more" like Inshorts */}
@@ -339,6 +352,17 @@ export default function NewsCard({ article, index, total, isActive }: Props) {
         <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
           <div className="text-[90px] drop-shadow-2xl" style={{ animation: "likeFlash 0.6s ease" }}>❤️</div>
         </div>
+      )}
+
+      {/* ── AI SUMMARY (5💎) ──────────────────────────────────── */}
+      {showSummary && (
+        <SummaryDiamondModal
+          articleId={article.id}
+          title={article.title}
+          lang={isNepali ? "ne" : "en"}
+          isNepali={isNepali}
+          onClose={() => setShowSummary(false)}
+        />
       )}
 
       {/* ── DETAIL PANEL ──────────────────────────────────────── */}
