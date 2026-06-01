@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 type Status = "loading" | "success" | "error";
 
 const AUTH_KEY = "inshorts-nepal-auth";
 
-export default function VerifyPage() {
+// Inner component that uses useSearchParams — must be inside <Suspense>
+function VerifyContent() {
   const params = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<Status>("loading");
@@ -28,10 +29,8 @@ export default function VerifyPage() {
           setStatus("error");
           setMessage(data.error);
         } else {
-          // Persist auth the same way AuthContext does
           localStorage.setItem(AUTH_KEY, JSON.stringify({ user: data.user, token: data.token }));
           setStatus("success");
-          // Redirect to home after a short delay so the user sees the success state
           setTimeout(() => router.replace("/"), 1500);
         }
       })
@@ -41,6 +40,59 @@ export default function VerifyPage() {
       });
   }, [params, router]);
 
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 16,
+        padding: "40px 32px",
+        maxWidth: 400,
+        width: "100%",
+        textAlign: "center",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+      }}
+    >
+      {status === "loading" && (
+        <>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>⏳</div>
+          <h2 style={{ margin: "0 0 8px", color: "#1a1a1a" }}>Verifying your link…</h2>
+          <p style={{ color: "#777", margin: 0 }}>Please wait a moment.</p>
+        </>
+      )}
+      {status === "success" && (
+        <>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
+          <h2 style={{ margin: "0 0 8px", color: "#1a1a1a" }}>You&apos;re signed in!</h2>
+          <p style={{ color: "#777", margin: 0 }}>Taking you to the app…</p>
+        </>
+      )}
+      {status === "error" && (
+        <>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>❌</div>
+          <h2 style={{ margin: "0 0 8px", color: "#1a1a1a" }}>Link invalid</h2>
+          <p style={{ color: "#777", margin: "0 0 24px" }}>{message}</p>
+          <a
+            href="/"
+            style={{
+              display: "inline-block",
+              background: "#e63946",
+              color: "#fff",
+              padding: "12px 28px",
+              borderRadius: 8,
+              textDecoration: "none",
+              fontWeight: 600,
+              fontSize: 15,
+            }}
+          >
+            Back to App
+          </a>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function VerifyPage() {
   return (
     <main
       style={{
@@ -53,56 +105,16 @@ export default function VerifyPage() {
         padding: "24px",
       }}
     >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 16,
-          padding: "40px 32px",
-          maxWidth: 400,
-          width: "100%",
-          textAlign: "center",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-        }}
-      >
-        {status === "loading" && (
-          <>
+      <Suspense
+        fallback={
+          <div style={{ textAlign: "center", color: "#777" }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>⏳</div>
-            <h2 style={{ margin: "0 0 8px", color: "#1a1a1a" }}>Verifying your link…</h2>
-            <p style={{ color: "#777", margin: 0 }}>Please wait a moment.</p>
-          </>
-        )}
-
-        {status === "success" && (
-          <>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
-            <h2 style={{ margin: "0 0 8px", color: "#1a1a1a" }}>You're signed in!</h2>
-            <p style={{ color: "#777", margin: 0 }}>Taking you to the app…</p>
-          </>
-        )}
-
-        {status === "error" && (
-          <>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>❌</div>
-            <h2 style={{ margin: "0 0 8px", color: "#1a1a1a" }}>Link invalid</h2>
-            <p style={{ color: "#777", margin: "0 0 24px" }}>{message}</p>
-            <a
-              href="/"
-              style={{
-                display: "inline-block",
-                background: "#e63946",
-                color: "#fff",
-                padding: "12px 28px",
-                borderRadius: 8,
-                textDecoration: "none",
-                fontWeight: 600,
-                fontSize: 15,
-              }}
-            >
-              Back to App
-            </a>
-          </>
-        )}
-      </div>
+            <p>Loading…</p>
+          </div>
+        }
+      >
+        <VerifyContent />
+      </Suspense>
     </main>
   );
 }
