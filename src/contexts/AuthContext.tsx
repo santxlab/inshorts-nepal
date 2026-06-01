@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 export interface AppUser {
@@ -126,24 +126,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [persist]);
 
   const signInWithGoogle = useCallback(async () => {
+    // signInWithPopup is blocked inside the Capacitor Android WebView (WebViews
+    // don't allow auth popups), so we use the REDIRECT flow: the app navigates
+    // to Google, then returns to the site where getRedirectResult() (in the
+    // effect below) finishes the sign-in. This call therefore navigates away and
+    // doesn't return a user inline.
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const fbUser = result.user;
-      return await signInWithSocial(
-        fbUser.email ?? `${fbUser.uid}@google.inshortsnepal.org`,
-        fbUser.displayName ?? "Google User",
-        "google",
-        fbUser.uid
-      );
+      provider.setCustomParameters({ prompt: "select_account" });
+      await signInWithRedirect(auth, provider);
+      return {}; // page is navigating to Google now
     } catch (err: unknown) {
-      const code = (err as { code?: string })?.code;
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        return {};
-      }
       console.error("[signInWithGoogle]", err);
       return { error: "Google sign-in failed. Please try again." };
     }
+  }, []);
+
+  // Complete a Google redirect sign-in when the WebView returns from Google.
+  useEffect(() => {
+    let cancelled = false;
+    getRedirectResult(auth)
+      .then((result) => {
+        if (cancelled || !result?.user) return;
+        const fbUser = result.user;
+        return signInWithSocial(
+          fbUser.email ?? `${fbUser.uid}@google.inshortsnepal.org`,
+          fbUser.displayName ?? "Google User",
+          "google",
+          fbUser.uid
+        );
+      })
+      .catch((err) => console.error("[getRedirectResult]", err));
+    return () => { cancelled = true; };
   }, [signInWithSocial]);
 
   const continueAsGuest = useCallback(() => {

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { TopicId } from "@/types";
 import { useUserPrefs } from "@/contexts/UserPrefsContext";
+import { useAuth } from "@/contexts/AuthContext";
 import NewsFeed from "@/components/NewsFeed";
 import TopHeader from "@/components/TopHeader";
 import BottomNav from "@/components/BottomNav";
@@ -18,8 +19,22 @@ type Tab = "home" | "discover" | "saved" | "profile";
 
 export default function Home() {
   const { prefs, loaded } = useUserPrefs();
+  const { isAuthenticated, openAuth } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [selectedTopic, setSelectedTopic] = useState<TopicId | null>(null);
+
+  // First-launch discoverability: once onboarding is done, show the sign-in
+  // screen ONE time to guests (they can still "Continue as Guest"). Without this
+  // the only way to find sign-in was to dig into the Profile tab, which users
+  // missed. Guarded by a localStorage flag so we never nag on later opens.
+  useEffect(() => {
+    if (!loaded || !prefs.onboardingCompleted || isAuthenticated) return;
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem("auth-first-prompt-done")) return;
+    localStorage.setItem("auth-first-prompt-done", "1");
+    const t = setTimeout(() => openAuth(), 700);
+    return () => clearTimeout(t);
+  }, [loaded, prefs.onboardingCompleted, isAuthenticated, openAuth]);
 
   // Keep push notification server updated with behavioral topic scores
   usePushBehaviorSync();
