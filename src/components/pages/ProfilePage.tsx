@@ -85,7 +85,7 @@ function ReferralSection({ userId, isNepali }: { userId: string; isNepali: boole
 }
 
 export default function ProfilePage() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, openAuth } = useAuth();
   const { prefs, resetPrefs } = useUserPrefs();
   const { gami } = useGamification();
   const isNepali = prefs.language !== "en";
@@ -133,6 +133,29 @@ export default function ProfilePage() {
           <span className="text-white font-bold text-sm">{rank.label}</span>
         </div>
       </div>
+
+      {/* Sign-in banner — shown only to guests */}
+      {(!user || user.isGuest) && (
+        <div className="mx-4 mt-4 p-5 rounded-2xl bg-gradient-to-br from-[#DC143C]/30 to-[#003893]/30 border border-white/15">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">👋</span>
+            <h3 className="text-white font-black text-base">
+              {isNepali ? "साइन इन गर्नुहोस्" : "Sign in to unlock everything"}
+            </h3>
+          </div>
+          <p className="text-white/55 text-xs mb-4 leading-relaxed">
+            {isNepali
+              ? "Google, फोन OTP वा इमेल लिङ्कबाट छिटो साइन इन गर्नुहोस् — पासवर्ड चाहिँदैन।"
+              : "Google, Phone OTP or Email link — no password needed. Sync bookmarks, earn referral diamonds & more."}
+          </p>
+          <button
+            onClick={openAuth}
+            className="w-full py-3.5 rounded-xl bg-white text-[#DC143C] font-black text-base shadow-lg active:scale-95 transition-transform"
+          >
+            {isNepali ? "साइन इन / खाता बनाउनुहोस्" : "Sign In / Create Account"}
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-0 border-b border-white/10">
