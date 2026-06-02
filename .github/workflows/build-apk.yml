@@ -32,6 +32,9 @@ jobs:
 
       # The app loads https://www.inshortsnepal.org via Capacitor server.url,
       # so we only need to sync assets (no Next.js build required).
+      - name: Create required android assets directory
+        run: mkdir -p android/app/src/main/assets
+
       - name: Sync Capacitor android assets
         run: npx cap sync android
 
