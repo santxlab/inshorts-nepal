@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { connectDB } from "@/lib/db";
 import { MagicTokenModel } from "@/models/MagicTokenModel";
-import { sendMagicLinkEmail } from "@/lib/resend";
+import { sendMagicLinkEmail, sendCodeEmail } from "@/lib/resend";
 
 const APP_URL = process.env.APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
@@ -24,11 +24,14 @@ function isRateLimited(email: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
-    const { email } = await req.json();
+    const { email, channel } = await req.json();
 
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
+
+    // "code" = native app (emails a 6-digit code); default = web (emails a magic link)
+    const useCode = channel === "code";
 
     const normalised = email.toLowerCase().trim();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -43,25 +46,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate a cryptographically secure token
+    // Generate a cryptographically secure token + a 6-digit code
     const token = crypto.randomBytes(32).toString("hex");
+    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     const db = await connectDB();
-    if (db) {
-      // Invalidate any existing unused tokens for this email
-      await MagicTokenModel.updateMany(
-        { email: normalised, used: false },
-        { used: true }
+    if (!db) {
+      return NextResponse.json(
+        { error: "Service unavailable. Please try again later." },
+        { status: 503 }
       );
-      await MagicTokenModel.create({ email: normalised, token, expiresAt });
     }
-    // Note: without MongoDB the token is not persisted — magic link won't work in
-    // local dev unless MONGODB_URI is set.
+
+    // Invalidate any existing unused tokens for this email
+    await MagicTokenModel.updateMany(
+      { email: normalised, used: false },
+      { used: true }
+    );
+    await MagicTokenModel.create({ email: normalised, token, code, expiresAt });
+
+    if (useCode) {
+      await sendCodeEmail(normalised, code);
+      return NextResponse.json({ message: "Check your email for the 6-digit code." });
+    }
 
     const magicUrl = `${APP_URL}/auth/verify?token=${token}`;
     await sendMagicLinkEmail(normalised, magicUrl);
-
     // Always return the same message to avoid email enumeration
     return NextResponse.json({ message: "Check your email for the sign-in link." });
   } catch (err) {

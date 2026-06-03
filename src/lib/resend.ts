@@ -51,3 +51,45 @@ export async function sendMagicLinkEmail(to: string, magicUrl: string): Promise<
     throw new Error("Failed to send email");
   }
 }
+
+/** Send a 6-digit sign-in code (used by the native mobile app). */
+export async function sendCodeEmail(to: string, code: string): Promise<void> {
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `${code} is your Inshorts Nepal sign-in code`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;padding:40px 32px;max-width:480px;">
+        <tr>
+          <td align="center">
+            <h1 style="margin:0 0 8px;font-size:22px;color:#1a1a1a;">Your sign-in code</h1>
+            <p style="margin:0 0 24px;color:#555;font-size:15px;line-height:1.5;">
+              Enter this code in the Inshorts Nepal app. It expires in <strong>15 minutes</strong>.
+            </p>
+            <div style="display:inline-block;background:#f5f5f5;border-radius:12px;padding:18px 32px;font-size:36px;font-weight:800;letter-spacing:10px;color:#e63946;">
+              ${code}
+            </div>
+            <hr style="margin:28px 0;border:none;border-top:1px solid #eee;">
+            <p style="margin:0;color:#bbb;font-size:12px;">
+              If you didn't request this, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+  });
+
+  if (error) {
+    console.error("[Resend] Failed to send code email:", error);
+    throw new Error("Failed to send email");
+  }
+}
