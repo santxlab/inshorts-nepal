@@ -5,7 +5,7 @@ export interface IUser extends Document {
   email: string;
   passwordHash?: string;
   avatarUrl?: string;
-  provider: "email" | "magic_link" | "google";
+  provider: "email" | "magic_link" | "google" | "phone";
   googleId?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -17,7 +17,7 @@ const UserSchema = new Schema<IUser>(
     email:        { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String },
     avatarUrl:    { type: String },
-    provider:     { type: String, enum: ["email", "magic_link", "google"], default: "email" },
+    provider:     { type: String, enum: ["email", "magic_link", "google", "phone"], default: "email" },
     googleId:     { type: String },
   },
   { timestamps: true }

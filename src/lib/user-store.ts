@@ -115,7 +115,7 @@ export const userStore = {
    */
   async findOrCreateByEmail(
     email: string,
-    opts: { name?: string; provider?: "magic_link" | "google"; googleId?: string } = {}
+    opts: { name?: string; provider?: "magic_link" | "google" | "phone"; googleId?: string } = {}
   ): Promise<{ user: AppUser; token: string }> {
     const db = await connectDB();
 
