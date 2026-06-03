@@ -51,7 +51,19 @@ export default function AdminUsersPage() {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    new Date(iso).toLocaleString("en-GB", {
+      day: "numeric", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    });
+
+  const ago = (iso: string) => {
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    if (s < 2592000) return `${Math.floor(s / 86400)}d ago`;
+    return `${Math.floor(s / 2592000)}mo ago`;
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -142,7 +154,10 @@ export default function AdminUsersPage() {
                       {p.icon} {p.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-400 hidden sm:table-cell">{fmt(u.createdAt)}</td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <div className="text-gray-300">{fmt(u.createdAt)}</div>
+                    <div className="text-gray-500 text-xs">{ago(u.createdAt)}</div>
+                  </td>
                 </tr>
               );
             })}
