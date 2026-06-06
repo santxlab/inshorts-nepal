@@ -180,4 +180,26 @@ export const userStore = {
     const u = memUsers.get(id);
     return u ? toPublicUser(u) : null;
   },
+
+  /** Update a user's profile fields (name, avatarUrl). */
+  async updateUser(
+    id: string,
+    data: { name?: string; avatarUrl?: string }
+  ): Promise<AppUser | null> {
+    const db = await connectDB();
+    if (db) {
+      const user = await UserModel.findByIdAndUpdate(
+        id,
+        { $set: data },
+        { new: true }
+      ).catch(() => null);
+      if (!user) return null;
+      return toPublicUser({ ...user.toObject(), id: String(user._id) });
+    }
+    // — in-memory fallback —
+    const u = memUsers.get(id);
+    if (!u) return null;
+    if (data.name) u.name = data.name;
+    return toPublicUser(u);
+  },
 };
