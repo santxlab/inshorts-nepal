@@ -6,6 +6,7 @@ import { detectTopics } from "./topics-config";
 import { detectCrossSourceBreaking } from "./breaking-detector";
 import { translateBatch } from "./translation-service";
 import { isOpenAIConfigured } from "./openai-client";
+import { generateImagesForArticles } from "./image-generator";
 // Summaries are generated on demand via /api/summary (not pre-fetched here), so
 // summary-service / do-agent-client are intentionally no longer imported.
 
@@ -367,13 +368,17 @@ export async function fetchAllSources(
     console.error("[breaking-detector] failed:", err);
   }
 
-  // Phase 2.2: background AI work after each fetch. Both jobs are cache-aware
+  // Phase 2.2: background AI work after each fetch. All jobs are cache-aware
   // — only NEW articles actually hit the LLMs on each cycle.
   // (a) TRANSLATE foreign-language articles (IN/Global English ↔ Nepali) — OpenAI.
-  // (b) SUMMARIZE every article into a 55-65 word inshorts version — DO Agent (DeepSeek).
+  // (b) GENERATE images via DALL-E 3 for articles that have no imageUrl — OpenAI.
+  // (c) SUMMARIZE: intentionally skipped here (on-demand via /api/summary only).
   setImmediate(() => {
     if (isOpenAIConfigured()) {
-      const foreign = store.getAllArticles().filter(
+      const allArticles = store.getAllArticles();
+
+      // (a) Translation
+      const foreign = allArticles.filter(
         (a) => a.origin === "in" || a.origin === "global"
       );
       translateBatch(foreign, ["ne", "en"], 2)
@@ -381,13 +386,29 @@ export async function fetchAllSources(
           if (r.succeeded > 0) console.log(`[translation] new: ${r.succeeded} · cached: ${r.cached}`);
         })
         .catch((err) => console.error("[translation] batch failed:", err));
+
+      // (b) Image generation for articles without photos
+      // Limit to recently fetched (last 2 hours) so we don't re-scan the whole
+      // pool on every run — articles fetched earlier already had their chance.
+      const cutoff = Date.now() - 2 * 3600_000;
+      const noImage = allArticles.filter(
+        (a) =>
+          !a.imageUrl &&
+          new Date(a.fetchedAt).getTime() >= cutoff
+      );
+      if (noImage.length > 0) {
+        generateImagesForArticles(noImage)
+          .then((r) => {
+            if (r.generated > 0)
+              console.log(`[image-generator] generated: ${r.generated} / ${noImage.length}`);
+          })
+          .catch((err) => console.error("[image-generator] batch failed:", err));
+      }
     }
-    // NOTE: AI summaries are intentionally NOT generated here anymore. They are
+    // NOTE: AI summaries are intentionally NOT generated here. They are
     // produced ON DEMAND when a user taps the "सारांश" pill (see /api/summary),
     // and shared via the MongoDB cache so the first tapper pays once and every
-    // reader after them gets it free. Pre-summarizing every article wasted
-    // tokens on stories nobody opened — and once summaries cost diamonds, work
-    // must only ever happen on an explicit user tap.
+    // reader after them gets it free.
   });
 
   return { added: totalAdded, sources: fetchedSources };
