@@ -114,6 +114,12 @@ export const pushManager = {
     language?: string;
     minBehaviorScore?: number;
     articleTopics?: TopicId[];
+    /**
+     * When true and topics is set, also include subscribers with NO topics
+     * saved (i.e. topics: []). This ensures general-audience users still
+     * receive breaking news even though they haven't personalized yet.
+     */
+    includeNoTopics?: boolean;
   }): Promise<PushSubscription[]> {
     let all: PushSubscription[] = [];
 
@@ -123,7 +129,15 @@ export const pushManager = {
         const query: Record<string, unknown> = {};
         if (filter?.language) query.language = filter.language;
         if (filter?.topics && filter.topics.length > 0) {
-          query.topics = { $in: filter.topics };
+          if (filter.includeNoTopics) {
+            // Subscribers with matching topics OR subscribers with no topics at all
+            query.$or = [
+              { topics: { $in: filter.topics } },
+              { topics: { $size: 0 } },
+            ];
+          } else {
+            query.topics = { $in: filter.topics };
+          }
         }
         const docs = await PushSubscriptionModel.find(query).lean();
         all = docs.map((d) => ({
@@ -144,7 +158,12 @@ export const pushManager = {
     } else {
       all = [...memSubs.values()];
       if (filter?.language) all = all.filter((s) => s.language === filter.language);
-      if (filter?.topics?.length) all = all.filter((s) => s.topics.some((t) => filter.topics!.includes(t)));
+      if (filter?.topics?.length) {
+        all = all.filter((s) =>
+          (filter.includeNoTopics && s.topics.length === 0) ||
+          s.topics.some((t) => filter.topics!.includes(t))
+        );
+      }
     }
 
     // Behavioral filter (always in-memory)
@@ -195,7 +214,7 @@ export const pushManager = {
       language?: string;
     },
     options: {
-      filter?: { topics?: TopicId[]; language?: string };
+      filter?: { topics?: TopicId[]; language?: string; includeNoTopics?: boolean };
       isBreaking?: boolean;
       articleTopics?: TopicId[];
       minBehaviorScore?: number;

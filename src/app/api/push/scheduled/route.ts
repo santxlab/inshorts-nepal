@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pushManager } from "@/lib/push-manager";
 import { store } from "@/lib/store";
+import type { TopicId } from "@/types";
 
 const CRON_SECRET = process.env.CRON_SECRET ?? "inshorts-cron-2026";
 
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
         sentBreakingIds.delete(sentBreakingIds.values().next().value as string);
       }
       const title = lang === "ne" ? "🚨 ब्रेकिङ न्युज" : "🚨 Breaking News";
+      const articleTopics = (article.topics ?? []) as TopicId[];
       const result = await pushManager.sendToSubscribers(
         {
           title,
@@ -108,7 +110,19 @@ export async function POST(req: NextRequest) {
           sourceUrl: article.sourceUrl,
           language: lang,
         },
-        { filter: { language: lang }, isBreaking: true }
+        {
+          // Filter: subscribers whose topics overlap the article's topics,
+          // PLUS subscribers with no topics set (general audience — they should
+          // still receive breaking news even if they haven't personalized yet).
+          filter: {
+            language: lang,
+            topics: articleTopics.length > 0 ? articleTopics : undefined,
+            includeNoTopics: articleTopics.length > 0,
+          },
+          isBreaking: true,
+          articleTopics,            // used for behavior-score ranking
+          minBehaviorScore: 0,      // breaking always sends regardless of score
+        }
       );
       return NextResponse.json({ success: true, type: "breaking", article: article.id, ...result });
     }
