@@ -7,11 +7,12 @@ import { ArticleImageModel } from "@/models/ArticleImageModel";
 
 export const dynamic = "force-dynamic";
 
+// Next.js 15+ passes params as a Promise
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   if (!id) {
     return new NextResponse("Missing id", { status: 400 });
   }
