@@ -31,14 +31,6 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch {
-    // Return a 1x1 transparent PNG on error
-    const fallback = Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-      "base64"
-    );
-    return new NextResponse(fallback, {
-      status: 200,
-      headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600" },
-    });
+    return new NextResponse(null, { status: 502 });
   }
 }
