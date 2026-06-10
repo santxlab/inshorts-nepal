@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { AppUser } from "@/contexts/AuthContext";
 import { connectDB } from "@/lib/db";
-import { UserModel } from "@/models/UserModel";
+import { UserModel, type IUserPreferences } from "@/models/UserModel";
 
 if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
   console.error("[SECURITY] JWT_SECRET env var is not set — using insecure default!");
@@ -21,6 +21,7 @@ interface MemUser {
   createdAt: string;
 }
 const memUsers = new Map<string, MemUser>();
+const memPrefs = new Map<string, IUserPreferences>();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export function signToken(userId: string): string {
@@ -201,5 +202,41 @@ export const userStore = {
     if (!u) return null;
     if (data.name) u.name = data.name;
     return toPublicUser(u);
+  },
+
+  /** Read a user's saved feed preferences (topics, region, language). */
+  async getPreferences(id: string): Promise<IUserPreferences | null> {
+    const db = await connectDB();
+    if (db) {
+      const user = await UserModel.findById(id).select("preferences").catch(() => null);
+      return user?.preferences ?? null;
+    }
+    return memPrefs.get(id) ?? null;
+  },
+
+  /** Upsert a user's feed preferences. Returns the stored preferences. */
+  async updatePreferences(
+    id: string,
+    data: Partial<IUserPreferences>
+  ): Promise<IUserPreferences | null> {
+    const clean: IUserPreferences = {
+      language: data.language,
+      region: data.region,
+      topics: Array.isArray(data.topics) ? data.topics.slice(0, 50) : [],
+      interested: Array.isArray(data.interested) ? data.interested.slice(0, 50) : [],
+      notInterested: Array.isArray(data.notInterested) ? data.notInterested.slice(0, 50) : [],
+      updatedAt: new Date(),
+    };
+    const db = await connectDB();
+    if (db) {
+      const user = await UserModel.findByIdAndUpdate(
+        id,
+        { $set: { preferences: clean } },
+        { new: true }
+      ).catch(() => null);
+      return user?.preferences ?? null;
+    }
+    memPrefs.set(id, clean);
+    return clean;
   },
 };
