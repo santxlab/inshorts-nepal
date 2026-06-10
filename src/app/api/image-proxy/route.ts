@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
         "Referer": decoded,
         "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(3000),
     });
 
     if (!res.ok) throw new Error(`Upstream ${res.status}`);
