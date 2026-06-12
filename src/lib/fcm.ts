@@ -73,7 +73,10 @@ export async function sendFcm(msg: FcmMessage): Promise<"ok" | "invalid" | "erro
   if (!cfg) return "error";
   try {
     const { token: accessToken } = await cfg.client.getAccessToken();
-    if (!accessToken) return "error";
+    if (!accessToken) {
+      console.error("[fcm] getAccessToken returned null — check service account credentials");
+      return "error";
+    }
 
     const res = await fetch(
       `https://fcm.googleapis.com/v1/projects/${cfg.projectId}/messages:send`,
@@ -100,15 +103,17 @@ export async function sendFcm(msg: FcmMessage): Promise<"ok" | "invalid" | "erro
     if (res.ok) return "ok";
 
     const errJson = (await res.json().catch(() => null)) as
-      | { error?: { status?: string; details?: { errorCode?: string }[] } }
+      | { error?: { status?: string; message?: string; details?: { errorCode?: string }[] } }
       | null;
     const code =
       errJson?.error?.details?.[0]?.errorCode || errJson?.error?.status;
+    console.error(`[fcm] HTTP ${res.status} code=${code} msg=${errJson?.error?.message?.slice(0, 120)}`);
     if (code === "UNREGISTERED" || code === "INVALID_ARGUMENT" || res.status === 404) {
       return "invalid";
     }
     return "error";
-  } catch {
+  } catch (err) {
+    console.error("[fcm] sendFcm exception:", err instanceof Error ? err.message : String(err));
     return "error";
   }
 }
