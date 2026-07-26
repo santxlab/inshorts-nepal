@@ -17,10 +17,14 @@ import { ArticleModel } from "@/models/ArticleModel";
 import { store } from "@/lib/store";
 import type { NewsArticle } from "@/types";
 
-const DALLE_URL = "https://api.openai.com/v1/images/generations";
+const IMAGE_API_URL = "https://api.openai.com/v1/images/generations";
+// gpt-image-1, not dall-e-3 — see callImageModel() for why.
+const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1";
+// "low" | "medium" | "high". medium ≈ $0.042/image at 1024x1024 and is plenty
+// for a card backdrop that sits behind a scrim with a headline over it.
+const IMAGE_QUALITY = process.env.OPENAI_IMAGE_QUALITY ?? "medium";
 const MAX_PER_BATCH = 10;
-const DALLE_TIMEOUT_MS = 45_000;
-const DOWNLOAD_TIMEOUT_MS = 30_000;
+const IMAGE_TIMEOUT_MS = 90_000;
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://inshortsnepal.org";
 
 export interface GenerateResult {
@@ -50,59 +54,54 @@ function buildPrompt(title: string, topics: string[], category: string): string 
 }
 
 // ---------------------------------------------------------------------------
-// DALL-E 3 call — returns the temporary image URL or null
+// Image generation call — returns the raw PNG bytes, or null.
+//
+// Model note: this used to call `dall-e-3` with response_format:"url", then
+// download from the returned CDN link. The account backing OPENAI_API_KEY does
+// NOT have dall-e-3 enabled (it 404s on the model), only `gpt-image-1`, so the
+// whole job silently produced nothing. gpt-image-1 also ALWAYS returns
+// base64 inline and rejects `response_format` outright — so there is no
+// temporary URL to download and the extra fetch hop is gone entirely.
 // ---------------------------------------------------------------------------
-async function callDalle(prompt: string): Promise<string | null> {
+async function callImageModel(prompt: string): Promise<Buffer | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
   try {
-    const res = await fetch(DALLE_URL, {
+    const res = await fetch(IMAGE_API_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "dall-e-3",
+        model: IMAGE_MODEL,
         prompt,
         n: 1,
         size: "1024x1024",
-        quality: "standard",
-        response_format: "url",
+        quality: IMAGE_QUALITY,
       }),
-      signal: AbortSignal.timeout(DALLE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
     });
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error(`[image-generator] DALL-E ${res.status}: ${body.slice(0, 300)}`);
+      console.error(`[image-generator] ${IMAGE_MODEL} ${res.status}: ${body.slice(0, 300)}`);
       return null;
     }
 
-    const data = (await res.json()) as { data?: { url?: string }[] };
-    return data.data?.[0]?.url ?? null;
+    const data = (await res.json()) as { data?: { b64_json?: string }[] };
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) {
+      console.error("[image-generator] response contained no b64_json");
+      return null;
+    }
+    return Buffer.from(b64, "base64");
   } catch (err) {
     console.error(
-      "[image-generator] DALL-E call failed:",
+      "[image-generator] image call failed:",
       err instanceof Error ? err.message : err
     );
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Download image binary from the temporary DALL-E CDN URL
-// ---------------------------------------------------------------------------
-async function downloadImage(url: string): Promise<Buffer | null> {
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
-    const ab = await res.arrayBuffer();
-    return Buffer.from(ab);
-  } catch {
     return null;
   }
 }
@@ -147,32 +146,28 @@ export async function generateImagesForArticles(
       article.category ?? "news"
     );
 
-    // 2. Generate via DALL-E
-    const tempUrl = await callDalle(prompt);
-    if (!tempUrl) continue;
-
-    // 3. Download binary before the 1-hour CDN URL expires
-    const imageData = await downloadImage(tempUrl);
+    // 2. Generate — bytes come back inline as base64, no CDN hop needed.
+    const imageData = await callImageModel(prompt);
     if (!imageData) continue;
 
     const servingUrl = `${BASE_URL}/api/article-image/${article.id}`;
 
     try {
-      // 4. Persist image binary in MongoDB
+      // 3. Persist image binary in MongoDB. gpt-image-1 returns PNG.
       await ArticleImageModel.create({
         articleId: article.id,
         imageData,
-        mimeType: "image/jpeg",
+        mimeType: "image/png",
         generatedAt: new Date(),
       });
 
-      // 5. Update ArticleModel so the URL survives restarts
+      // 4. Update ArticleModel so the URL survives restarts
       await ArticleModel.updateOne(
         { articleId: article.id },
         { $set: { imageUrl: servingUrl } }
       );
 
-      // 6. Patch in-memory store so the change is live immediately.
+      // 5. Patch in-memory store so the change is live immediately.
       // getAllArticles() shallow-copies the array but NOT the objects, so
       // mutating a found article updates the original store entry.
       const memArticle = store.getAllArticles().find((a: NewsArticle) => a.id === article.id);
