@@ -7,6 +7,7 @@ import { detectCrossSourceBreaking } from "./breaking-detector";
 import { translateBatch } from "./translation-service";
 import { isOpenAIConfigured } from "./openai-client";
 import { generateImagesForArticles } from "./image-generator";
+import { backfillOgImages } from "./og-image-service";
 // Summaries are generated on demand via /api/summary (not pre-fetched here), so
 // summary-service / do-agent-client are intentionally no longer imported.
 
@@ -368,16 +369,36 @@ export async function fetchAllSources(
     console.error("[breaking-detector] failed:", err);
   }
 
-  // Phase 2.2: background AI work after each fetch. All jobs are cache-aware
-  // — only NEW articles actually hit the LLMs on each cycle.
-  // (a) TRANSLATE foreign-language articles (IN/Global English ↔ Nepali) — OpenAI.
-  // (b) GENERATE images via DALL-E 3 for articles that have no imageUrl — OpenAI.
-  // (c) SUMMARIZE: intentionally skipped here (on-demand via /api/summary only).
-  setImmediate(() => {
-    if (isOpenAIConfigured()) {
-      const allArticles = store.getAllArticles();
+  // Background work after each fetch. All jobs are cache-aware — only NEW
+  // articles actually do work on each cycle.
+  // (a) SCRAPE og:image for articles the RSS feed gave no picture for — free,
+  //     no API key, and yields a REAL photo of the actual story.
+  // (b) TRANSLATE foreign-language articles (IN/Global English ↔ Nepali) — OpenAI.
+  // (c) GENERATE images for whatever still has no photo — OpenAI (costs money).
+  // (d) SUMMARIZE: intentionally skipped here (on-demand via /api/summary only).
+  setImmediate(async () => {
+    const allArticles = store.getAllArticles();
 
-      // (a) Translation
+    // (a) og:image backfill. Runs FIRST and unconditionally (no API key needed).
+    // extractImage() only inspects the RSS item, and many Nepali publishers put
+    // no image there at all — but ~78% of those articles do expose an og:image
+    // on their own page. Doing this before (c) means we only ever pay to
+    // generate an image for articles that truly have no photo anywhere.
+    const cutoffOg = Date.now() - 2 * 3600_000;
+    const missingImages = allArticles.filter(
+      (a) => !a.imageUrl && new Date(a.fetchedAt).getTime() >= cutoffOg
+    );
+    if (missingImages.length > 0) {
+      try {
+        await backfillOgImages(missingImages);
+      } catch (err) {
+        console.error("[og-image] backfill failed:", err);
+      }
+    }
+
+    if (isOpenAIConfigured()) {
+
+      // (b) Translation
       const foreign = allArticles.filter(
         (a) => a.origin === "in" || a.origin === "global"
       );
@@ -387,11 +408,11 @@ export async function fetchAllSources(
         })
         .catch((err) => console.error("[translation] batch failed:", err));
 
-      // (b) Image generation for articles without photos
-      // Limit to recently fetched (last 2 hours) so we don't re-scan the whole
-      // pool on every run — articles fetched earlier already had their chance.
+      // (c) Paid image generation — ONLY for what the og:image pass above could
+      // not recover. Re-read the store rather than reusing `missingImages`,
+      // since (a) has since filled a large share of them in place.
       const cutoff = Date.now() - 2 * 3600_000;
-      const noImage = allArticles.filter(
+      const noImage = store.getAllArticles().filter(
         (a) =>
           !a.imageUrl &&
           new Date(a.fetchedAt).getTime() >= cutoff
