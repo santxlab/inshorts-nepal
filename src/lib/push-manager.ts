@@ -69,6 +69,11 @@ export const pushManager = {
           { endpoint: sub.endpoint },
           {
             userId:        sub.userId,
+            // NOTE: this update doc enumerates fields explicitly, so anything
+            // missing here is silently dropped no matter what the caller sent.
+            // deviceId was exactly that — accepted by the subscribe route,
+            // attached to the object, then thrown away here.
+            deviceId:      sub.deviceId,
             endpoint:      sub.endpoint,
             kind:          sub.kind ?? "web",
             keys:          sub.keys,

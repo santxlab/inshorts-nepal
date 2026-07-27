@@ -3,6 +3,11 @@ import type { TopicId } from "@/types";
 
 export interface IPushSubscription extends Document {
   userId: string;
+  // The anonymous device id the mobile app already sends as X-Device-Id on
+  // /api/feed and /api/signals. Without it the push path cannot join to
+  // UserBehaviorModel, where the app's real per-topic affinity actually lives —
+  // so notification targeting was blind to everything the ranker knows.
+  deviceId?: string;
   endpoint: string;
   keys?: { p256dh: string; auth: string };
   kind: "web" | "expo" | "fcm";
@@ -19,6 +24,7 @@ export interface IPushSubscription extends Document {
 const PushSubscriptionSchema = new Schema<IPushSubscription>(
   {
     userId:   { type: String, required: true, default: "anon" },
+    deviceId: { type: String, index: true },
     endpoint: { type: String, required: true, unique: true, index: true },
     // Web push keys are optional — native (Expo) subscriptions don't have them.
     keys: {

@@ -6,11 +6,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { subscription, userId, topics, language, topicScores, expoPushToken, fcmToken } = body;
+    // Fall back to the X-Device-Id header the mobile client already sends on
+    // every other API call, so older clients that don't post it in the body
+    // still get linked to their behaviour profile.
+    const deviceId: string | undefined =
+      body.deviceId ?? req.headers.get("x-device-id") ?? undefined;
 
     // Native app (direct FCM) sends a raw FCM device token.
     if (fcmToken) {
       const fcmSub: PushSubscription = {
         userId: userId ?? "anon",
+        deviceId,
         endpoint: fcmToken,                // token is the unique key
         kind: "fcm",
         fcmToken,

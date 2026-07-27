@@ -10,6 +10,7 @@
 // successful unlock (charged or previously-owned) should reveal the summary.
 import { NextRequest, NextResponse } from "next/server";
 import { spendForArticle } from "@/lib/diamond-service";
+import { userStore } from "@/lib/user-store";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +22,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const subjectId = (body.subjectId || "").trim();
+  const authHeader = req.headers.get("authorization");
+  let authenticatedSubjectId: string | null = null;
+  if (authHeader) {
+    const token = authHeader.replace("Bearer ", "").trim();
+    const user = userStore.verifyToken(token);
+    if (user?.id) authenticatedSubjectId = user.id;
+  }
+
+  const subjectId = authenticatedSubjectId ?? (body.subjectId || "").trim();
   const articleId = (body.articleId || "").trim();
   if (!subjectId || !articleId) {
     return NextResponse.json({ error: "subjectId and articleId required" }, { status: 400 });
+  }
+
+  if (authenticatedSubjectId && body.subjectId && body.subjectId !== authenticatedSubjectId) {
+    return NextResponse.json({ error: "Cannot spend for another user" }, { status: 403 });
   }
 
   try {

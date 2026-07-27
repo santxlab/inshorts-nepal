@@ -306,6 +306,8 @@ export interface SocialPost {
 // ═══════════════════════════════════════════
 export interface PushSubscription {
   userId: string;
+  /** Anonymous device id — lets push targeting read the device's behaviour profile. */
+  deviceId?: string;
   endpoint: string;
   // Web push uses keys; Expo push uses expoPushToken; native FCM uses fcmToken.
   keys?: { p256dh: string; auth: string };
