@@ -17,10 +17,16 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 // poll (5) + three article reads (3) — and a single summary costs 5, so guests
 // got exactly two summaries a day. The wall arrived before they had engaged
 // enough to want an account, so it read as "this feature is broken" rather than
-// "sign up for more". 30 covers a real session while registered stays 3x better.
-export const DAILY_CAP_ANON = 30;
+export const DAILY_CAP_ANON = 20;
 export const DAILY_CAP_REGISTERED = 100;
 export const SUMMARY_COST = 5;
+
+// Polls pay 5 — the single most valuable action, 5x an article read — so they
+// are the fastest way to burn the daily cap. Guests are limited to 3 polls a
+// day (15 diamonds) so the poll reward cannot consume their entire 20-diamond
+// allowance before they have read anything. Registered users are unrestricted:
+// all 7 daily polls (35) sit comfortably inside their 100 cap.
+export const DAILY_POLLS_ANON = 3;
 
 export interface IDiamond extends Document {
   subjectId: string;
@@ -28,6 +34,7 @@ export interface IDiamond extends Document {
   registered: boolean;
   earnedToday: number;     // engagement diamonds counted against the daily cap
   earnedDate: string;      // YYYY-MM-DD the earnedToday counter belongs to
+  pollsToday: number;      // poll_answer earns today (guests are limited)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +46,7 @@ const DiamondSchema = new Schema<IDiamond>(
     registered: { type: Boolean, required: true, default: false },
     earnedToday:{ type: Number, required: true, default: 0 },
     earnedDate: { type: String, required: true, default: "" },
+    pollsToday: { type: Number, required: true, default: 0 },
   },
   { timestamps: true }
 );

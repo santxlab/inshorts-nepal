@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
     const result = await earn(subjectId, amount, {
       registered: typeof body.registered === "boolean" ? body.registered : !!authenticatedSubjectId,
       kind: "engagement",
+      // Guests are limited to a few paid polls a day — polls pay 5, so they
+      // would otherwise consume the whole allowance before any reading.
+      isPoll: action === "poll_answer",
     });
     if (result.reason === "db_unavailable") {
       return NextResponse.json({ error: "wallet unavailable", ...result }, { status: 503 });

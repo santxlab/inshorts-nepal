@@ -19,6 +19,7 @@ import {
   DiamondUnlockModel,
   DAILY_CAP_ANON,
   DAILY_CAP_REGISTERED,
+  DAILY_POLLS_ANON,
   SUMMARY_COST,
 } from "@/models/DiamondModel";
 
@@ -186,6 +187,8 @@ export interface EarnResult {
   balance: number;
   remainingToday: number;
   cappedOut: boolean;     // true when the daily cap blocked some/all of the request
+  /** Guest hit the per-day poll limit (distinct from running out of cap). */
+  pollLimited?: boolean;
   reason?: "db_unavailable";
 }
 
@@ -196,7 +199,7 @@ export interface EarnResult {
 export async function earn(
   subjectId: string,
   amount: number,
-  opts: { registered?: boolean; kind?: EarnKind } = {}
+  opts: { registered?: boolean; kind?: EarnKind; isPoll?: boolean } = {}
 ): Promise<EarnResult> {
   const conn = await connectDB();
   if (!conn) {
@@ -231,11 +234,26 @@ export async function earn(
   for (let attempt = 0; attempt < 4; attempt++) {
     const cur = await DiamondModel.findOne({ subjectId }).lean<{
       balance: number; registered: boolean; earnedToday: number; earnedDate: string;
+      pollsToday?: number;
     }>();
     if (!cur) continue;
 
     const cap = capFor(cur.registered);
-    const earnedToday = cur.earnedDate === day ? cur.earnedToday : 0;
+    const sameDay = cur.earnedDate === day;
+    const earnedToday = sameDay ? cur.earnedToday : 0;
+    const pollsToday = sameDay ? (cur.pollsToday ?? 0) : 0;
+
+    // Guests get at most DAILY_POLLS_ANON paid polls a day. Polls pay 5 — 5x an
+    // article read — so without this a guest could spend their whole allowance
+    // on polls in under a minute and earn nothing from actually reading.
+    if (opts.isPoll && !cur.registered && pollsToday >= DAILY_POLLS_ANON) {
+      return {
+        ok: true, granted: 0, balance: cur.balance,
+        remainingToday: Math.max(0, cap - earnedToday),
+        cappedOut: true, pollLimited: true,
+      };
+    }
+
     const allowed = Math.max(0, cap - earnedToday);
     const grant = Math.min(amt, allowed);
 
@@ -252,7 +270,13 @@ export async function earn(
       { subjectId, earnedToday: cur.earnedToday, earnedDate: cur.earnedDate },
       {
         $inc: { balance: grant },
-        $set: { earnedToday: earnedToday + grant, earnedDate: day },
+        $set: {
+          earnedToday: earnedToday + grant,
+          earnedDate: day,
+          // Reset the poll counter on a new day alongside the earn counter, so
+          // the two can never disagree about which day they belong to.
+          pollsToday: pollsToday + (opts.isPoll ? 1 : 0),
+        },
       },
       { new: true }
     ).lean<{ balance: number; registered: boolean; earnedToday: number; earnedDate: string }>();
