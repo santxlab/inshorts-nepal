@@ -1,11 +1,15 @@
-// Phase 2.2 — Short-form Inshorts-style summaries via the DigitalOcean Agent
-// (DeepSeek V3.2). One summary per (articleId, lang, mode), cached in MongoDB
-// and shared across all users → first user pays the cost, everyone else reads
-// it free.
+// Short-form Inshorts-style summaries. One summary per (articleId, lang, mode),
+// cached in MongoDB and shared across all users → the first reader pays the
+// cost, everyone after them reads it free.
+//
+// Generation goes through text-ai.ts, which tries Groq (llama-3.3-70b) first,
+// then the DO agent, then OpenAI. This used to call the DO agent directly, and
+// when that single key expired Saransh silently returned nothing with no
+// fallback — the pill just did nothing for every user.
 //   mode "short" → 30–40 words (in-app news card)
 //   mode "long"  → 60–70 words (full story reader)
 import type { NewsArticle } from "@/types";
-import { chat, isDoAgentConfigured } from "./do-agent-client";
+import { generateText, isTextAIConfigured } from "./text-ai";
 import { connectDB } from "./db";
 import { SummaryModel, type SummaryMode } from "@/models/SummaryModel";
 
@@ -82,7 +86,7 @@ export async function summarizeArticle(
   lang: Lang,
   mode: SummaryMode = "long"
 ): Promise<string | null> {
-  if (!isDoAgentConfigured()) return null;
+  if (!isTextAIConfigured()) return null;
   const dbOk = (await connectDB()) !== null;
 
   // Cache lookup
@@ -105,7 +109,7 @@ export async function summarizeArticle(
         (lang === "ne"
           ? `\n\nREMINDER: तपाईंको जवाफ पूर्ण रूपमा नेपाली (देवनागरी) मा मात्र हुनुपर्छ।`
           : `\n\nREMINDER: Your entire answer MUST be in English.`);
-    const result = await chat(sys, buildPrompt(article, lang, mode));
+    const result = await generateText(sys, buildPrompt(article, lang, mode));
     if (!result) break;
     const text = result.content.trim();
     if (text === "ERROR" || !text) break;

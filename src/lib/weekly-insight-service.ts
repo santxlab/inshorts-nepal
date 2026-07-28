@@ -1,4 +1,4 @@
-import { chat } from "./do-agent-client";
+import { generateText } from "./text-ai";
 import { WeeklyInsightModel, IWeeklyInsight } from "@/models/WeeklyInsightModel";
 import { ArticleModel } from "@/models/ArticleModel";
 import { connectDB } from "./db";
@@ -102,7 +102,7 @@ Return this JSON structure (in English):
 }
 Include 3-4 pages.`;
 
-  const result = await chat(systemPrompt, userPrompt, { temperature: 0.5, maxTokens: 1200 });
+  const result = await generateText(systemPrompt, userPrompt, { temperature: 0.5, maxTokens: 1200 });
   if (!result) return null;
 
   try {
