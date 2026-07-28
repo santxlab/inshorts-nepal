@@ -145,6 +145,41 @@ export async function spendForArticle(
   return { ok: true, unlocked: true, charged: true, balance: charged.balance };
 }
 
+/**
+ * Undo a spend when the thing the user paid for could not be delivered.
+ *
+ * The app charges BEFORE generating the summary, so while the text provider was
+ * down every tap on सारांश took 5💎 and returned an error — the user paid for
+ * nothing, with no way to get it back. This releases the unlock and credits the
+ * diamonds so a retry is possible.
+ *
+ * Idempotent: if the unlock is already gone (someone refunded, or it was never
+ * charged) nothing is credited, so this cannot be replayed to mint diamonds.
+ */
+export async function refundArticle(
+  subjectId: string,
+  articleId: string
+): Promise<{ ok: boolean; refunded: boolean; balance: number }> {
+  const conn = await connectDB();
+  if (!conn) return { ok: false, refunded: false, balance: 0 };
+
+  // Deleting the unlock is the guard — only the caller that actually removes a
+  // row is allowed to credit, so concurrent refunds cannot double-credit.
+  const del = await DiamondUnlockModel.deleteOne({ subjectId, articleId });
+  if (del.deletedCount !== 1) {
+    const w = await getWallet(subjectId);
+    return { ok: true, refunded: false, balance: w?.balance ?? 0 };
+  }
+
+  const credited = await DiamondModel.findOneAndUpdate(
+    { subjectId },
+    { $inc: { balance: SUMMARY_COST } },
+    { new: true }
+  ).lean<{ balance: number }>();
+
+  return { ok: true, refunded: true, balance: credited?.balance ?? 0 };
+}
+
 export interface EarnResult {
   ok: boolean;
   granted: number;        // diamonds actually credited (may be < requested if capped)

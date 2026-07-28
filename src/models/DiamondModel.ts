@@ -13,7 +13,12 @@
 //   • registered → 100 / day
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export const DAILY_CAP_ANON = 10;
+// A guest hit the old cap of 10 in roughly three minutes — daily_open (2) +
+// poll (5) + three article reads (3) — and a single summary costs 5, so guests
+// got exactly two summaries a day. The wall arrived before they had engaged
+// enough to want an account, so it read as "this feature is broken" rather than
+// "sign up for more". 30 covers a real session while registered stays 3x better.
+export const DAILY_CAP_ANON = 30;
 export const DAILY_CAP_REGISTERED = 100;
 export const SUMMARY_COST = 5;
 
