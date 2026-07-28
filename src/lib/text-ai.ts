@@ -25,6 +25,12 @@ export interface TextAIOptions {
   maxTokens?: number;
   /** Skip providers below this one; used by callers that need max quality. */
   preferOpenAI?: boolean;
+  /**
+   * Caller will JSON.parse the result. Providers that support enforced JSON
+   * turn it on — without it, models emit unescaped quotes inside Nepali
+   * strings and the payload fails to parse about half the time.
+   */
+  json?: boolean;
 }
 
 export function isTextAIConfigured(): boolean {
@@ -45,16 +51,19 @@ export async function generateText(
   userPrompt: string,
   opts: TextAIOptions = {}
 ): Promise<ChatResult | null> {
-  const { preferOpenAI, ...rest } = opts;
+  const { preferOpenAI, json, ...rest } = opts;
+  // Only Groq is wired for enforced JSON here; the others just get the prompt,
+  // which is what they had before.
+  const groqOpts = { ...rest, json };
 
   const chain: { name: string; enabled: boolean; run: () => Promise<ChatResult | null> }[] =
     preferOpenAI
       ? [
           { name: "openai", enabled: isOpenAIConfigured(), run: () => openaiChat(systemPrompt, userPrompt, rest) },
-          { name: "groq", enabled: isGroqConfigured(), run: () => groqChat(systemPrompt, userPrompt, rest) },
+          { name: "groq", enabled: isGroqConfigured(), run: () => groqChat(systemPrompt, userPrompt, groqOpts) },
         ]
       : [
-          { name: "groq", enabled: isGroqConfigured(), run: () => groqChat(systemPrompt, userPrompt, rest) },
+          { name: "groq", enabled: isGroqConfigured(), run: () => groqChat(systemPrompt, userPrompt, groqOpts) },
           { name: "do-agent", enabled: isDoAgentConfigured(), run: () => doChat(systemPrompt, userPrompt, rest) },
           { name: "openai", enabled: isOpenAIConfigured(), run: () => openaiChat(systemPrompt, userPrompt, rest) },
         ];

@@ -13,7 +13,7 @@
 // article is simply omitted from cross-language results (graceful degradation).
 
 import type { NewsArticle } from "@/types";
-import { chat, isOpenAIConfigured } from "./openai-client";
+import { generateText, isTextAIConfigured } from "./text-ai";
 import { connectDB } from "./db";
 import { TranslationModel } from "@/models/TranslationModel";
 
@@ -103,7 +103,7 @@ export async function translateArticle(
   if (article.language === targetLang) {
     return { title: article.title, summary: article.summary };
   }
-  if (!isOpenAIConfigured()) return null;
+  if (!isTextAIConfigured()) return null;
 
   const dbOk = (await connectDB()) !== null;
 
@@ -120,8 +120,16 @@ export async function translateArticle(
     }
   }
 
-  // OpenAI call
-  const result = await chat(SYSTEM_PROMPT, buildPrompt(article, targetLang));
+  // json:true is REQUIRED — parseTranslateOutput() JSON.parses this, and
+  // without enforced JSON the model emits unescaped double quotes inside
+  // Nepali values ("प्राचीन राजधानी") which fails to parse about half the time.
+  // maxTokens is raised because Devanagari costs far more tokens per character
+  // than Latin; the English-sized default truncated summaries mid-sentence.
+  const result = await generateText(SYSTEM_PROMPT, buildPrompt(article, targetLang), {
+    json: true,
+    maxTokens: 2000,
+    temperature: 0.2,
+  });
   if (!result) return null;
   const parsed = parseTranslateOutput(result.content);
   if (!parsed) return null;
@@ -142,7 +150,7 @@ export async function translateArticle(
           targetLang,
           title: fields.title,
           summary: fields.summary,
-          modelName: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+          modelName: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
         },
         { upsert: true, new: true }
       );
@@ -165,7 +173,7 @@ export async function translateBatch(
   targetLangs: Lang[],
   concurrency = 4
 ): Promise<{ attempted: number; succeeded: number; cached: number }> {
-  if (!isOpenAIConfigured()) {
+  if (!isTextAIConfigured()) {
     return { attempted: 0, succeeded: 0, cached: 0 };
   }
 

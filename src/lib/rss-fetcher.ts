@@ -6,6 +6,7 @@ import { detectTopics } from "./topics-config";
 import { detectCrossSourceBreaking } from "./breaking-detector";
 import { translateBatch } from "./translation-service";
 import { isOpenAIConfigured } from "./openai-client";
+import { isTextAIConfigured } from "./text-ai";
 import { generateImagesForArticles } from "./image-generator";
 import { backfillOgImages } from "./og-image-service";
 // Summaries are generated on demand via /api/summary (not pre-fetched here), so
@@ -396,9 +397,9 @@ export async function fetchAllSources(
       }
     }
 
-    if (isOpenAIConfigured()) {
-
-      // (b) Translation
+    // (b) Translation — now goes through the provider chain (Groq first), so
+    // it no longer requires an OpenAI key.
+    if (isTextAIConfigured()) {
       const foreign = allArticles.filter(
         (a) => a.origin === "in" || a.origin === "global"
       );
@@ -407,10 +408,14 @@ export async function fetchAllSources(
           if (r.succeeded > 0) console.log(`[translation] new: ${r.succeeded} · cached: ${r.cached}`);
         })
         .catch((err) => console.error("[translation] batch failed:", err));
+    }
 
-      // (c) Paid image generation — ONLY for what the og:image pass above could
-      // not recover. Re-read the store rather than reusing `missingImages`,
-      // since (a) has since filled a large share of them in place.
+    // (c) Paid image generation — OpenAI only; Groq has no image model, so this
+    // is the one job with no fallback. It is also the least critical now that
+    // og:image recovers ~80% of missing photos and the rest fall back to the
+    // bundled Nepal placeholder set, so when there is no OpenAI credit we skip
+    // it silently rather than logging a failure every cycle.
+    if (isOpenAIConfigured() && process.env.DISABLE_AI_IMAGES !== "1") {
       const cutoff = Date.now() - 2 * 3600_000;
       const noImage = store.getAllArticles().filter(
         (a) =>

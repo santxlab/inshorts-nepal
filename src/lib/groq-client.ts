@@ -39,10 +39,25 @@ function stripReasoning(s: string): string {
     .trim();
 }
 
+export interface GroqOptions {
+  temperature?: number;
+  maxTokens?: number;
+  model?: string;
+  /**
+   * Force a syntactically valid JSON object response.
+   *
+   * Required for any caller that JSON.parses the output. Without it the model
+   * emits UNESCAPED double quotes inside Nepali string values — e.g.
+   * `"प्राचीन राजधानी" युनेस्को` — which breaks JSON.parse on roughly half of
+   * real translations. With it, measured 4/4 valid.
+   */
+  json?: boolean;
+}
+
 export async function chat(
   systemPrompt: string,
   userPrompt: string,
-  opts: { temperature?: number; maxTokens?: number; model?: string } = {}
+  opts: GroqOptions = {}
 ): Promise<ChatResult | null> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
@@ -62,7 +77,10 @@ export async function chat(
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        ...(opts.json ? { response_format: { type: "json_object" } } : {}),
         temperature: opts.temperature ?? 0.3,
+        // Devanagari costs far more tokens per character than Latin, so a
+        // budget sized for English silently truncates Nepali mid-sentence.
         max_tokens: opts.maxTokens ?? 400,
       }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
