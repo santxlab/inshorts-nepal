@@ -410,12 +410,19 @@ export async function fetchAllSources(
         .catch((err) => console.error("[translation] batch failed:", err));
     }
 
-    // (c) Paid image generation — OpenAI only; Groq has no image model, so this
-    // is the one job with no fallback. It is also the least critical now that
-    // og:image recovers ~80% of missing photos and the rest fall back to the
-    // bundled Nepal placeholder set, so when there is no OpenAI credit we skip
-    // it silently rather than logging a failure every cycle.
-    if (isOpenAIConfigured() && process.env.DISABLE_AI_IMAGES !== "1") {
+    // (c) Per-article AI image generation — OFF by default.
+    //
+    // No double consumption: a card that already has an image does not need a
+    // second one bought for it. og:image now recovers ~80% of missing photos
+    // (a REAL photo of the actual story, which always beats a generated one),
+    // and the remaining ~20% fall back to the 106 bundled Nepal placeholders
+    // matched by headline keyword. So paying per article buys a marginal
+    // improvement on a shrinking slice, forever.
+    //
+    // Generated stock is the better use of image credit: one spend, reused by
+    // every future article that matches the theme, versus one spend used once.
+    // Set ENABLE_AI_IMAGES=1 to turn per-article generation back on.
+    if (isOpenAIConfigured() && process.env.ENABLE_AI_IMAGES === "1") {
       const cutoff = Date.now() - 2 * 3600_000;
       const noImage = store.getAllArticles().filter(
         (a) =>
