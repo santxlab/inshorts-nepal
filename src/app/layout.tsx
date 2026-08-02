@@ -8,9 +8,9 @@ import AuthModalWrapper from "@/components/auth/AuthModalWrapper";
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://www.inshortsnepal.org";
 
 export const metadata: Metadata = {
-  title: "InShorts Nepal - Nepal News in 60 Seconds",
-  description: "Nepal news in 60 seconds. Breaking news, politics, sports, tech & more in Nepali, English and 8 languages.",
-  keywords: "Nepal news, Nepali news, InShorts Nepal, short news, समाचार, नेपाल, news in 60 seconds",
+  title: "InShorts Nepal - Shorts News in 1 Minute",
+  description: "Nepal news in 1 minute. Breaking news, politics, sports, tech & more in Nepali, English and 8 languages.",
+  keywords: "Nepal news, Nepali news, InShorts Nepal, short news, समाचार, नेपाल, news in 1 minute",
   manifest: "/manifest.json",
   metadataBase: new URL(BASE_URL),
   appleWebApp: {
@@ -19,8 +19,8 @@ export const metadata: Metadata = {
     title: "InShorts Nepal",
   },
   openGraph: {
-    title: "InShorts Nepal 🇳🇵 — News in 60s",
-    description: "Nepal's fastest news app. Stories in 60 seconds.",
+    title: "InShorts Nepal 🇳🇵 — News in 1 Minute",
+    description: "Nepal's fastest news app. Shorts news in 1 minute.",
     type: "website",
     url: BASE_URL,
     siteName: "InShorts Nepal",
@@ -29,14 +29,14 @@ export const metadata: Metadata = {
         url: `${BASE_URL}/logo-primary-dark.png`,
         width: 1200,
         height: 630,
-        alt: "InShorts Nepal — News in 60s",
+        alt: "InShorts Nepal — News in 1 Minute",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "InShorts Nepal — News in 60s",
-    description: "Nepal's fastest news app. Stories in 60 seconds.",
+    title: "InShorts Nepal — News in 1 Minute",
+    description: "Nepal's fastest news app. Shorts news in 1 minute.",
     images: [`${BASE_URL}/logo-primary-dark.png`],
   },
   icons: {

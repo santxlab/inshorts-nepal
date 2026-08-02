@@ -1,7 +1,7 @@
 {
   "name": "InShorts Nepal",
   "short_name": "InShorts",
-  "description": "Nepal news in 60 seconds — Nepali, English & 8 more languages",
+  "description": "Nepal news in 1 minute — Nepali, English & 8 more languages",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
